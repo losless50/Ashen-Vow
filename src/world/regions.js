@@ -12,7 +12,7 @@ export const REGIONS = [
   { key: 'mirror',     name: 'Mirror Lake',       blurb: 'A tower on an island in still water.',               built: false, map: { x: .52, y: .36 }, boss: null },
   { key: 'stonebloom', name: 'Stonebloom Cliffs', blurb: 'Pink blossom on grey stone.',                        built: false, map: { x: .75, y: .48 }, boss: 'skull' },
   { key: 'hollowroot', name: 'Hollowroot Caverns', blurb: 'The dark under the cliffs.',                        built: false, map: { x: .90, y: .65 }, boss: 'skull' },
-  { key: 'sunken',     name: 'Sunken Vault',      blurb: 'Ruins half-drowned in the eastern shallows.',        built: false, map: { x: .78, y: .80 }, boss: 'skull' },
+  { key: 'sunken',     name: 'Sunken Vault',      blurb: 'Ruins half-drowned in the eastern shallows.',        built: true,  map: { x: .78, y: .80 }, boss: 'crown' },
   { key: 'blighted',   name: 'The Blighted Woods', blurb: 'Purple rot at the capital’s edge.',                 built: false, map: { x: .64, y: .25 }, boss: 'skull' },
   { key: 'frostveil',  name: 'Frostveil Summit',  blurb: 'Snow, and something crowned.',                       built: false, map: { x: .46, y: .12 }, boss: 'crown' },
   { key: 'eldoria',    name: 'Eldoria',           blurb: 'The royal capital, and the throne.',                 built: false, map: { x: .77, y: .20 }, boss: 'crown' },

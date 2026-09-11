@@ -32,6 +32,8 @@ export const defaults = {
   fires: ['hearthwood'],
   /** The region whose fire he last rested at — where he wakes. */
   region: 'hearthwood',
+  /** Last named campfire used within each region. */
+  restSites: {},
   /** Main bosses put down, by kind (the Warden is `won`). */
   bosses: {},
   /** Where the embers fell when he last died, and how many. Walk back to them. */
@@ -175,6 +177,10 @@ function sanitize(raw) {
   if (raw.camp) progress.buildings.shelter = true;
   progress.fires = Array.isArray(raw.fires) ? raw.fires.filter(k => typeof k === 'string') : [];
   progress.region = typeof raw.region === 'string' && raw.region ? raw.region : 'hearthwood';
+  progress.restSites = {};
+  if (raw.restSites && typeof raw.restSites === 'object')
+    for (const key of ['hearthwood', 'echo', 'sunken'])
+      if (typeof raw.restSites[key] === 'string' && /^[a-z0-9-]{1,64}$/.test(raw.restSites[key])) progress.restSites[key] = raw.restSites[key];
   progress.bosses = {};
   // Hushmaw was replaced by Vaelira; a save that felled it has felled her.
   if (raw.bosses && typeof raw.bosses === 'object') for (const [k, v] of Object.entries(raw.bosses)) if (v === true) progress.bosses[k === 'hushmaw' ? 'vaelira' : k] = true;

@@ -37,6 +37,33 @@ export const ECHO = {
   cave: { x: 2450, y: 1790 },
 };
 
+/**
+ * The vault gate faces west, square onto the road, so the last thing he does in
+ * the grove is walk straight into it. The curtain wall crosses the road from the
+ * northern trees down to the shore and the one arch left standing is the only way
+ * through it.
+ */
+export const ECHO_VAULT_GATE = { x: 2850, y: 1756 };
+/**
+ * The wall either side of the opening, with returns east to the map edge so the
+ * pocket behind it cannot be walked around. `h` is how far the stone is drawn up
+ * the screen: the southern half is kept low so it never stands over the road.
+ */
+export const ECHO_VAULT_WALLS = [
+  { x0: 2824, y0: 1580, x1: 2876, y1: 1692, h: 196 },
+  { x0: 2824, y0: 1580, x1: ECHO_W, y1: 1598, h: 150 },
+  { x0: 2824, y0: 1880, x1: 2876, y1: 1992, h: 80 },
+  { x0: 2824, y0: 1974, x1: ECHO_W, y1: 1992, h: 80 },
+];
+/** The cheeks of the passage: where the arch springs, and where it came down. */
+export const ECHO_VAULT_JAMBS = { north: 1692, south: 1880 };
+export const echoVaultWallBlocked = (x, y, radius = 0) => ECHO_VAULT_WALLS.some(w =>
+  x > w.x0 - radius && x < w.x1 + radius && y > w.y0 - radius && y < w.y1 + radius);
+
+export const ECHO_VAULT_TORCHES = [
+  [2664, 1934], [2800, 1698], [2800, 1874], [2934, 1700], [2934, 1872],
+].map(([x, y]) => ({ x, y }));
+
 export const ECHO_PATHS = [
   // Pass beside the hearth, then meet the other roads in the junction.
   [[1400, 0], [1390, 130], [1340, 280], [1350, 420], [1390, 550], [1400, 680]],
@@ -44,6 +71,8 @@ export const ECHO_PATHS = [
   [[1400, 680], [1580, 715], [1810, 775], [2100, 800], [2280, 810]],
   [[1400, 680], [1380, 880], [1420, 1110], [1370, 1350], [1400, 1540]],
   [[1400, 1540], [1560, 1660], [1850, 1740], [2140, 1790], [2330, 1800]],
+  // The vault road bends south around the den, then runs dead east into the gate.
+  [[2330, 1800], [2330, 2060], [2560, 2090], [2700, 1990], [2764, 1856], [2790, 1756], [3000, 1756]],
   // A short approach to Mycel's mouth, around the front of the mound.
   [[1400, 1540], [1360, 1650], [1280, 1735], [1190, 1750]],
 ].map(roundedTrail);
@@ -65,7 +94,9 @@ const openGround = (x, y, pad = 0) =>
   || inPool(x, y, 24 + pad);
 const inRuin = (x, y, pad = 0) => ECHO.ruins.some(r => Math.hypot(x - r.x, y - r.y) < r.r + pad);
 const nearPlace = (x, y) =>
-  inRuin(x, y, 40) ||
+  echoVaultWallBlocked(x, y, 40) || inRuin(x, y, 40)
+  // The gate lights itself; a grove lantern here would only stand in the way.
+  || Math.hypot(x - ECHO_VAULT_GATE.x, y - ECHO_VAULT_GATE.y) < 220 ||
   Math.hypot(x - ECHO.fire.x, y - ECHO.fire.y) < 90 || Math.hypot(x - ECHO.cave.x, y - ECHO.cave.y) < 130
   || Math.hypot(x - ECHO.cookfire.x, y - ECHO.cookfire.y) < 80 || Math.hypot(x - ECHO.sporehouse.x, y - ECHO.sporehouse.y - 30) < 150
   || Math.hypot(x - ECHO.burrow.x, y - ECHO.burrow.y) < 130 || ECHO.huts.some(h => Math.hypot(x - h.x, y - h.y) < 80);
@@ -291,6 +322,7 @@ function paintEcho(g, rng, pal = GROUND.shut) {
     for (let i = 0; i < 14; i++) { const a = rng() * Math.PI * 2, r = rng(); ellipse(g, p.x + Math.cos(a) * r * p.rx, p.y + Math.sin(a) * r * p.ry, 5 + rng() * 7, 2 + rng() * 3, '#1e4a38'); }
   }
   for (const r of ECHO.ruins) paintRuin(g, r, rng);
+  paintVaultGate(g, rng);
   // Mycel's cave: a mound of earth and root at the hollow's rim, with a mouth in it.
   const m = ECHO.burrow;
   ellipse(g, m.x, m.y - 20, 150, 96, '#0d1310');
@@ -324,6 +356,37 @@ function paintEcho(g, rng, pal = GROUND.shut) {
   poly(g, [[d.x - 64, d.y + 26], [d.x - 56, d.y - 40], [d.x - 24, d.y - 76], [d.x + 24, d.y - 76], [d.x + 56, d.y - 40], [d.x + 64, d.y + 26]], '#0a0806');
   poly(g, [[d.x - 48, d.y + 22], [d.x - 42, d.y - 30], [d.x - 18, d.y - 62], [d.x + 18, d.y - 62], [d.x + 42, d.y - 30], [d.x + 48, d.y + 22]], '#030202');
   for (let i = 0; i < 8; i++) rect(g, d.x - 40 + i * 11, d.y - 64 + (i % 2) * 6, 4, 9 + (i % 3) * 4, '#241a12');
+}
+
+/**
+ * The road does not stop at the gate: it is paved through it, so the way east
+ * reads as a way east from a long way off.
+ */
+function paintVaultGate(g, rng) {
+  const { x, y } = ECHO_VAULT_GATE, { north, south } = ECHO_VAULT_JAMBS;
+  // The sill: worn flags from the approach, through the wall, out to the shore.
+  poly(g, [[2704, north + 24], [ECHO_W, north + 8], [ECHO_W, south - 8], [2704, south - 30]], '#2c2f26');
+  poly(g, [[2740, north + 34], [ECHO_W, north + 20], [ECHO_W, south - 20], [2740, south - 40]], '#43453a');
+  for (let fx = 2712; fx < ECHO_W; fx += 34) {
+    const top = north + 30 - (fx - 2712) * .05, bottom = south - 34 + (fx - 2712) * .05;
+    for (let fy = top; fy < bottom; fy += 30)
+      rect(g, fx + rng() * 3, fy + rng() * 3, 28 + rng() * 4, 24 + rng() * 4, rng() < .35 ? '#565847' : '#4c4e40');
+  }
+  // The dark the passage stands in, thrown across the way through. It is ground,
+  // not a sprite, so he walks over it instead of into it.
+  ellipse(g, x, (north + south) / 2, 52, 108, '#141d1e99');
+  ellipse(g, x, (north + south) / 2, 38, 94, '#0f1618bb');
+  ellipse(g, x + 6, y + 98, 44, 19, '#12201f88');
+  // Standing water in the ruts, because the flood east of here never went down.
+  for (let i = 0; i < 26; i++) {
+    const px = 2712 + rng() * (ECHO_W - 2712), py = y - 60 + rng() * 150;
+    ellipse(g, px, py, 9 + rng() * 22, 4 + rng() * 8, i % 3 ? '#1b3038' : '#24424a');
+  }
+  // What the wall shed: rubble banked against both cheeks of the opening.
+  for (let i = 0; i < 70; i++) {
+    const px = 2740 + rng() * 240, side = i % 2 ? north + 6 + rng() * 22 : south - 28 + rng() * 22;
+    rect(g, px, side, 4 + rng() * 11, 3 + rng() * 6, ['#4a5248', '#39423a', '#5d6253'][i % 3]);
+  }
 }
 
 /** Everything the world needs to stand in the grove. Built once, on first entry. */
@@ -413,6 +476,10 @@ export function buildEcho(TREE) {
       ...ECHO.ruins.filter(r => r.chest).map(r => ({ ...r.chest, x: r.x, y: r.y + 8, type: 'chest' })),
     ],
     solids: [
+      // The crown of the arch and the bank it brought down with it. It holds the
+      // walk through to the northern half of the opening, which is the half that
+      // is never behind stone.
+      { x: ECHO_VAULT_GATE.x - 2, y: ECHO_VAULT_GATE.y + 92, rx: 50, ry: 46, name: 'the fallen crown' },
       { x: ECHO.fire.x, y: ECHO.fire.y + 4, rx: 20, ry: 11, name: 'grove fire' },
       { x: ECHO.sporehouse.x, y: ECHO.sporehouse.y + 40, rx: 48, ry: 18, name: 'the sporehouse stalk' },
       { x: ECHO.cookfire.x, y: ECHO.cookfire.y + 4, rx: 22, ry: 12, name: 'the cookpot' },
@@ -426,9 +493,15 @@ export function buildEcho(TREE) {
       ruins: ECHO.ruins, stones,
     },
     inWater: inPool,
+    terrainBlocked: echoVaultWallBlocked,
     bounds: { minX: 30, maxX: W - 30, minY: 20, maxY: H - 30 },
     fire: ECHO.fire,
     /** Walking back off the north path returns to Hearthwood's south road. */
-    exits: [{ x0: 1320, x1: 1480, y0: 0, y1: 26, to: 'hearthwood', at: { x: 668, y: 1020 } }],
+    exits: [
+      { x0: 1320, x1: 1480, y0: 0, y1: 26, to: 'hearthwood', at: { x: 668, y: 1020 } },
+      // East, past the den, to the drowned kingdom — barred while she holds it.
+      { x0: 2884, x1: W, y0: 1600, y1: 1972, to: 'sunken', at: { x: 150, y: 1500 }, needs: 'vaelira',
+        barred: 'The water east of the den has not gone down. Something under it is still being held shut.' },
+    ],
   };
 }

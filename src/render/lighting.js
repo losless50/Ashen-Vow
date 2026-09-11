@@ -5,6 +5,8 @@ import { player, progress, lostHere } from '../core/state.js';
 import { bossSpec } from '../systems/boss.js';
 import { QUARRY } from '../world/quarry.js';
 import { groveDawned } from '../world/grove.js';
+import { ECHO_VAULT_TORCHES } from '../world/echo.js';
+import * as vault from '../world/sunken.js';
 import { rect, ellipse, poly, path } from './primitives.js';
 
 function radial(stops) {
@@ -152,6 +154,46 @@ function groveLights(c, flicker) {
   }
 }
 
+/** Cold dusk over the vault; warm wayfinding lights and a restrained tidal glow. */
+function vaultLights(c, flicker) {
+  const { SUNKEN, SUNKEN_FIRES, SUNKEN_TORCHES } = vault;
+  darkness(c, .56, '#07121e');
+  c.globalCompositeOperation = 'screen';
+  if (props.waterGlow) {
+    c.globalAlpha = .8 + Math.sin(game.time * .45) * .08;
+    c.drawImage(props.waterGlow, 0, 0, vault.SUNKEN_W, vault.SUNKEN_H);
+  }
+  // Slow phosphorescent eddies and pinpricks, each safely inside its water patch.
+  for (const m of props.waterMotes) {
+    const x = m.x + Math.sin(game.time * .32 + m.phase) * 6;
+    const y = m.y + Math.cos(game.time * .27 + m.phase) * 4;
+    const pulse = .5 + Math.sin(game.time * 1.1 + m.phase) * .35;
+    light(c, x, y, 28, pulse * .55, tealGlow);
+    c.globalAlpha = pulse;
+    rect(c, x, y, 2, 2, '#c6ffec');
+    const ring = (game.time * .14 + m.phase / (Math.PI * 2)) % 1;
+    c.globalAlpha = (1 - ring) * .25;
+    c.strokeStyle = '#81e6d1'; c.lineWidth = 1;
+    c.beginPath(); c.ellipse(x, y, 5 + ring * 15, 2 + ring * 6, 0, 0, Math.PI * 2); c.stroke();
+  }
+  for (const f of SUNKEN_FIRES) {
+    light(c, f.x, f.y - 8, 175 * flicker, 1, amberGlow);
+    light(c, f.x, f.y - 8, 60 * flicker, .9);
+  }
+  for (const t of SUNKEN_TORCHES) {
+    const pulse = 1 + Math.sin(game.time * 11 + t.x) * .035;
+    light(c, t.x, t.y - 48, 124 * pulse, .85, amberGlow);
+    light(c, t.x, t.y - 48, 36 * pulse, .9);
+  }
+  light(c, SUNKEN.depths.x, SUNKEN.depths.y, 100 * flicker, .35, amberGlow);
+  light(c, SUNKEN.halls.x, SUNKEN.halls.y, 120, .24, tealGlow);
+  for (const f of SUNKEN.falls) light(c, f.x, f.y, 96, .3, tealGlow);
+  light(c, player.x, player.y - 20, 70, .23, holyGlow);
+  if (progress.owned.includes('lantern')) light(c, player.x, player.y - 16, LANTERN_R * flicker, .3, lanternGlow);
+  const dropped = lostHere();
+  if (dropped) light(c, dropped.x, dropped.y - 8, 96 * flicker, 1);
+}
+
 export function atmosphere(c) {
   c.save();
   c.globalCompositeOperation = 'screen';
@@ -159,6 +201,8 @@ export function atmosphere(c) {
   const lost = lostHere();
   if (game.scene === 'wild' && game.region === 'echo') {
     groveLights(c, flicker);
+    c.globalCompositeOperation = 'screen';
+    for (const t of ECHO_VAULT_TORCHES) light(c, t.x, t.y - 48, 135 * flicker, .9, amberGlow);
   } else if (game.scene === 'room') {
     const house = game.room === 'sporehouse';
     darkness(c, house ? .3 : .45, house ? '#120c16' : '#04080a');
@@ -188,6 +232,8 @@ export function atmosphere(c) {
       if (shift) light(c, b.x, b.y - 40, 200, .7, tealGlow);
       for (const s of entities.shots) light(c, s.x, s.y, 22, .6, s.kind === 'acid' ? tealGlow : amberGlow);
     } else if (b?.hp > 0) light(c, b.x, b.y - 40, b.phase === 2 ? 90 : 60, .7, tealGlow);
+  } else if (game.scene === 'wild' && game.region === 'sunken') {
+    vaultLights(c, flicker);
   } else if (game.scene === 'wild') {
     light(c, 714, 576, 108 * flicker, .6);
     light(c, 714, 575, 39 * flicker, 1);

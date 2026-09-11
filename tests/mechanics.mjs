@@ -32,6 +32,7 @@ const rooms = await import('../src/systems/rooms.js');
 const grove = await import('../src/world/grove.js');
 const saves = await import('../src/core/saves.js');
 const scenes = await import('../src/render/scenes.js');
+const sunken = await import('../src/world/sunken.js');
 const { boons } = await import('../src/core/state.js');
 const vaelira = await import('../src/systems/vaelira.js');
 const { WHIP: whip } = await import('../src/systems/vaelira-patterns.js');
@@ -1198,10 +1199,16 @@ check('old saves migrate their supply shelter', () => {
   assert.equal(progress.weapon, 0);
 });
 
-check('creature and Warden sprites render in every state and every skin, in both regions', () => {
+check('creature and Warden sprites render in every state and every skin, in every region', () => {
   const seen = new Set();
   const populations = [];
   for (const region of ['hearthwood', 'echo']) { spawnEnemies(region); populations.push([...entities.enemies]); }
+  // The vault needs her down to be populated at all — and the grove needs her up.
+  const wasVaelira = progress.bosses.vaelira;
+  progress.bosses.vaelira = true;
+  spawnEnemies('sunken');
+  populations.push([...entities.enemies]);
+  progress.bosses.vaelira = wasVaelira;
   for (const key of ['sporehouse', 'burrow']) { const slain = progress.slain; progress.slain = []; rooms.enterRoom(key); populations.push([...entities.enemies]); rooms.leaveRoom(); progress.slain = slain; }
   game.scene = 'wild';
   for (const population of populations) {
@@ -1613,6 +1620,43 @@ check('grove trails provide a clear walking corridor through their bends and jun
   }
   world.enterRegion('hearthwood');
   spawnEnemies('hearthwood');
+});
+
+check('the vault gate faces the road, and is the only way past its wall', () => {
+  world.enterRegion('echo');
+  const gate = echoMod.ECHO_VAULT_GATE;
+  // He walks straight east into it: the whole run from the approach to the map
+  // edge is clear at the road's own height, with no turn behind the stone.
+  for (let x = 2700; x <= world.bounds.maxX; x += 5)
+    assert.equal(world.blocked(x, gate.y, 15), false, 'the way through stays clear');
+  // The wall itself crosses the road, above and below the opening.
+  for (const y of [1620, 1660, 1920, 1960])
+    assert.equal(world.blocked(gate.x, y, 15), true, 'the wall stands either side of the gate');
+  // Seal only the opening: there must then be no way into the exit pocket.
+  function reachesExit(seal) {
+    const queue = [[2600,2060]], seen = new Set(['2600,2060']);
+    for (let i = 0; i < queue.length; i++) {
+      const [x,y] = queue[i];
+      if (x >= 2920 && y >= 1700 && y <= 1860) return true;
+      for (const [nx,ny] of [[x-20,y],[x+20,y],[x,y-20],[x,y+20]]) {
+        const key = `${nx},${ny}`;
+        if (nx < 2580 || nx > world.bounds.maxX || ny < 1400 || ny > world.bounds.maxY || seen.has(key)) continue;
+        if (world.blocked(nx,ny,15) || seal && Math.abs(nx-gate.x)<40 && Math.abs(ny-gate.y)<130) continue;
+        seen.add(key); queue.push([nx,ny]);
+      }
+    }
+    return false;
+  }
+  assert.equal(reachesExit(false), true, 'the gate leads onto the exit path');
+  assert.equal(reachesExit(true), false, 'neither end of the wall can be walked around');
+  // The reason the gate was turned to face him: anything standing south of the
+  // road draws over him, so nothing south of it may reach up as far as the road.
+  const feet = gate.y + 8;
+  for (const w of echoMod.ECHO_VAULT_WALLS)
+    if (w.y0 > gate.y) assert.ok(w.y0 - w.h > feet, `wall at ${w.y0} is drawn clear of the road`);
+  for (const t of echoMod.ECHO_VAULT_TORCHES)
+    if (t.y > gate.y) assert.ok(t.y - 68 > feet, `the torch at ${t.x},${t.y} is drawn clear of the road`);
+  world.enterRegion('hearthwood');
 });
 
 check('wolves lunge and sporelings burst; resting in the grove remembers its fire', () => {
@@ -2129,6 +2173,183 @@ check('rain falls on the ground, not on the camera', () => {
   // Heavier weather means more of it.
   assert.ok(scenes.rainDrops({ x: 0, y: 0, w: 640, h: 420 }, t, 1).length
     > scenes.rainDrops({ x: 0, y: 0, w: 640, h: 420 }, t, .3).length, 'a downpour has more drops than a drizzle');
+});
+
+check('the Sunken Vault: east of the grove, shut until the thorn is out of the den', () => {
+  const saved = structuredClone(progress);
+  world.enterRegion('echo');
+  // The east road past the den is barred while she holds it.
+  progress.bosses = {};
+  const east = world.exitAt(2940, 1756);
+  assert.ok(east && east.to === 'sunken', 'the road east is where the den is');
+  assert.equal(east.needs, 'vaelira', 'and it names what holds it shut');
+  game.scene = 'wild'; game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+  player.x = 2860; player.y = 1756;
+  keys.add('d');
+  for (let i = 0; i < 20; i++) update(.035);
+  keys.clear();
+  assert.equal(game.region, 'echo', 'walking into it does not cross over');
+  assert.ok(player.x <= world.bounds.maxX, 'and he is pushed back onto the grove side');
+  // With her down it opens, and lands him on the vault's western road.
+  progress.bosses.vaelira = true;
+  player.x = 2860; player.y = 1756;
+  keys.add('d');
+  for (let i = 0; i < 20; i++) update(.035);
+  keys.clear();
+  assert.equal(game.region, 'sunken', 'now the water has gone down');
+  assert.ok(player.x < 400, 'arriving on the western road');
+  // The vault is a real region: its own map, bounds, fire and way back.
+  assert.equal(world.size.w, sunken.SUNKEN_W);
+  assert.equal(world.size.h, sunken.SUNKEN_H);
+  assert.equal(world.fire.x, sunken.SUNKEN.fire.x, 'one fire, on the shelf');
+  assert.ok(world.npcs.some(n => n.type === 'fire'), 'and it can be rested at');
+  assert.ok(world.trees.length > 20, 'dead palms on the sand');
+  assert.equal(world.props.rain, 0, 'the vault is not the grove');
+  spawnEnemies('sunken');
+  assert.ok(entities.enemies.length >= 12, 'and things are walking the causeways');
+  draw();
+  // The water is water: you cannot walk the lake, but the causeway over it holds.
+  assert.equal(world.inRiver(1150, 1000), true, 'the open lake is deep');
+  assert.equal(world.inRiver(1900, 1700), true, 'on both sides of the causeway');
+  assert.equal(world.inRiver(sunken.SUNKEN.throne.x, sunken.SUNKEN.throne.y - 200), false, 'the throne platform is not');
+  assert.equal(sunken.onCauseway(1500, 1800), true, 'the southern arm is a deck');
+  assert.equal(world.inRiver(1500, 1800), false, 'and a deck does not drown him');
+  // Every named place stands on ground he can actually reach.
+  for (const [name, p] of [['the fire', sunken.SUNKEN.fire], ['the depths', sunken.SUNKEN.depths],
+    ['the halls', sunken.SUNKEN.halls], ['the village', sunken.SUNKEN.village], ['the gate', sunken.SUNKEN.gate]]) {
+    assert.equal(world.inRiver(p.x, p.y), false, `${name} is on dry footing`);
+  }
+  // Follow every deck continuously, including its joins to the court.
+  for (const route of sunken.SUNKEN_PATHS) for (let i = 1; i < route.length; i++) {
+    const [ax, ay] = route[i - 1], [bx, by] = route[i];
+    const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / 5);
+    for (let j = 0; j <= steps; j++) {
+      const x = ax + (bx - ax) * j / steps, y = ay + (by - ay) * j / steps;
+      if (Math.hypot(x - sunken.SUNKEN.fire.x, y - sunken.SUNKEN.fire.y) < 45) continue;
+      assert.equal(world.blocked(x, y, 12), false, `clear vault deck at ${x},${y}`);
+    }
+  }
+  for (let y = 1000; y <= 1680; y += 5)
+    assert.equal(world.inRiver(1500, y), false, 'north and south decks meet the throne');
+  assert.ok(world.trees.filter(t => t.bush).length >= 100, 'saltbush grows off the routes');
+  assert.ok(world.props.critters.some(k => k.kind === 'lizard'), 'desert lizards inhabit the sand');
+  // The vault's people, not the grove's beasts.
+  const kinds = new Set(entities.enemies.map(e => e.kind));
+  assert.ok(['rogue', 'bandit', 'corsair'].every(k => kinds.has(k)), 'rogues, bandits and corsairs');
+  assert.ok(!['wolf', 'sporeling', 'frog'].some(k => kinds.has(k)), 'and nothing that belongs in the grove');
+  // Spawn placement is independent of this environment/flow pass.
+  // Things move under the water, and only under the water.
+  assert.ok(world.props.swimmers.length > 20, 'the bowl is not empty');
+  assert.ok(world.props.swimmers.some(w => w.kind === 'shark'), 'and not all of it is small');
+  for (const w of world.props.swimmers) {
+    // Every one of them circles a patch that stays in open water all the way round.
+    for (let i = 0; i < 8; i++) {
+      const t = i / 8 * Math.PI * 2;
+      assert.equal(world.inRiver(w.x + Math.cos(t) * w.r, w.y + Math.sin(t) * w.r * .62), true,
+        'a swimmer never circles out onto the stone');
+    }
+  }
+  // The village is built of things he has to walk around.
+  assert.ok(sunken.SUNKEN.houses.length >= 6, 'a village worth the name');
+  for (const b of sunken.SUNKEN.houses) assert.equal(world.inRiver(b.x, b.y), false, 'and all of it on sand');
+  assert.ok(world.blocked(sunken.SUNKEN.houses[0].x, sunken.SUNKEN.houses[0].y), 'houses are solid');
+  // Nothing has taken root on the throne's court.
+  for (const t of world.trees)
+    assert.ok(Math.hypot(t.x - sunken.SUNKEN.throne.x, (t.y - sunken.SUNKEN.throne.y) / .78) > sunken.SUNKEN.throne.r,
+      'no palm is standing on the throne platform');
+  // And the way back west to the grove.
+  const back = world.exitAt(10, 1500);
+  assert.ok(back && back.to === 'echo', 'the road home is on the west edge');
+  world.enterRegion('hearthwood');
+  Object.assign(progress, saved);
+  spawnEnemies('hearthwood');
+});
+
+check('vault terraces connect through stairs and leave room across their streets', () => {
+  const saved = structuredClone(progress);
+  world.enterRegion('sunken');
+  for (const s of sunken.SUNKEN_STAIRS) {
+    for (let y = s.y - 24; y <= s.y + s.h + 24; y += 4) {
+      assert.equal(world.blocked(s.x, y, 15), false, 'a stair is usable across its full rise');
+    }
+    assert.equal(world.blocked(s.x + s.w / 2 + 24, s.y + s.h / 2, 10), true,
+      'the retaining face beside a stair cannot be walked through');
+  }
+  for (const route of sunken.SUNKEN_PATHS) for (let i = 1; i < route.length; i++) {
+    const [ax, ay] = route[i - 1], [bx, by] = route[i];
+    const len = Math.hypot(bx - ax, by - ay), steps = Math.ceil(len / 16);
+    for (let j = 0; j <= steps; j++) for (const side of [-24, 0, 24]) {
+      const x = ax + (bx - ax) * j / steps - (by - ay) / len * side;
+      const y = ay + (by - ay) * j / steps + (bx - ax) / len * side;
+      if (Math.hypot(x - sunken.SUNKEN.fire.x, y - sunken.SUNKEN.fire.y) < 60) continue;
+      assert.equal(world.blocked(x, y, 15), false, `room along both sides of the street at ${x},${y}`);
+    }
+  }
+  // Flood from the arrival gate through actual collision, not just drawn routes.
+  const step = 20, cols = sunken.SUNKEN_W / step, rows = sunken.SUNKEN_H / step;
+  const seen = new Uint8Array(cols * rows), pass = new Uint8Array(cols * rows);
+  for (let y = 1; y < rows - 1; y++) for (let x = 1; x < cols - 1; x++)
+    pass[y * cols + x] = !world.blocked(x * step, y * step, 15);
+  const start = 120 * cols + 75, queue = [start]; seen[start] = 1;
+  for (let i = 0; i < queue.length; i++) {
+    const id = queue[i], x = id % cols, y = Math.floor(id / cols);
+    for (const [nx, ny] of [[x-1,y],[x+1,y],[x,y-1],[x,y+1]]) {
+      const next = ny * cols + nx;
+      if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || seen[next] || !pass[next]) continue;
+      seen[next] = 1; queue.push(next);
+    }
+  }
+  for (const [name, x, y] of [['grove entrance',100,1500], ['village',580,820],
+    ['upper stair',1560,300], ['fire approach',1640,600], ['court',1500,1290],
+    ['gardens',2300,950], ['quay',2360,1780], ['western bank',700,1500]]) {
+    assert.equal(seen[Math.round(y/step)*cols+Math.round(x/step)], 1, `${name} connects to the gate`);
+  }
+  world.enterRegion('hearthwood'); Object.assign(progress, saved);
+});
+
+check('the causeway holds: he cannot walk off the stone into the water', () => {
+  const saved = structuredClone(progress);
+  progress.bosses.vaelira = true;
+  world.enterRegion('sunken');
+  game.scene = 'wild'; game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+  const PAINTED_HALF = sunken.CAUSEWAY_HALF + 4;
+  // The invariant that matters: everywhere he is allowed to stand was painted as
+  // land. Collision shrinks the land by its padding, so standing room can only
+  // ever be a subset of the stone — swept over the whole region, not sampled.
+  let walkableInLake = 0;
+  for (let x = 60; x < sunken.SUNKEN_W; x += 37) {
+    for (let y = 60; y < sunken.SUNKEN_H; y += 37) {
+      const standable = !sunken.inSunkenWater(x, y, 6);
+      if (!standable) continue;
+      assert.equal(sunken.inSunkenWater(x, y, 0), false, `painted water at ${x},${y} can be stood on`);
+      if (Math.hypot((x - 1500) / 1090, (y - 1300) / 900) < 1) walkableInLake++;
+    }
+  }
+  assert.ok(walkableInLake > 200, 'and there is a real network of deck out over the lake');
+  // The arms themselves have deck to stand on, and it runs out.
+  for (const [x, y] of [[1500, 1750], [1500, 900], [1500, 1950]]) {
+    let reach = 0;
+    while (reach < 80 && !world.inRiver(x + reach, y)) reach++;
+    assert.ok(reach > 6, `there is deck to stand on at ${x},${y} (${reach})`);
+    assert.ok(reach < PAINTED_HALF, `and it ends inside the kerb at ${x},${y} (${reach} of ${PAINTED_HALF})`);
+  }
+  // And walking hard at the edge does not put him in the lake.
+  player.x = 1500; player.y = 1750;
+  player.hp = state.maxHp(); player.st = 100;
+  keys.add('d');
+  for (let i = 0; i < 60; i++) update(.035);
+  keys.clear();
+  assert.equal(world.inRiver(player.x, player.y), false, 'he is still on the causeway');
+  assert.ok(player.x - 1500 < PAINTED_HALF, 'and did not slide past the kerb');
+  // The same going the other way, and north-south across an arm.
+  player.x = 1500; player.y = 1750;
+  keys.add('a');
+  for (let i = 0; i < 60; i++) update(.035);
+  keys.clear();
+  assert.equal(world.inRiver(player.x, player.y), false, 'nor off the other side');
+  world.enterRegion('hearthwood');
+  Object.assign(progress, saved);
+  spawnEnemies('hearthwood');
 });
 
 check('the character sheet figure renders without disturbing the player', () => {

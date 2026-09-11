@@ -77,3 +77,29 @@ await goToScreen('play', { instant: true });
 assert.equal(player.x, before.x);
 assert.equal(player.hp, before.hp);
 console.log('PASS returning from the title while alive preserves the active session');
+
+const { SUNKEN_FIRES } = await import('../src/world/sunken.js');
+progress.bosses.vaelira = true;
+for (const f of SUNKEN_FIRES) {
+  crossTo('sunken', { x: f.x, y: f.y + 46 });
+  const site = world.npcs.find(n => n.id === f.id);
+  rest(site);
+  assert.equal(progress.restSites.sunken, f.id);
+  crossTo('echo', { x: 1400, y: 600 });
+  respawn({ silent: true });
+  assert.equal(game.region, 'sunken');
+  assert.equal(player.x, f.x);
+  assert.equal(player.y, f.y + 46);
+  assert.equal(world.blocked(player.x, player.y), false);
+  state.save();
+  state.resetProgress();
+  state.loadProgress();
+  world.enterRegion('hearthwood');
+  respawn({ silent: true });
+  assert.equal(world.fire.id, f.id, 'a saved named fire survives a reload');
+  assert.equal(player.x, f.x);
+}
+progress.restSites.sunken = 'removed-fire';
+world.enterRegion('sunken');
+assert.equal(world.fire.x, SUNKEN_FIRES[0].x, 'unknown fire ids fall back to the temple');
+console.log('PASS all vault campfires restore supplies and persist their individual return points');

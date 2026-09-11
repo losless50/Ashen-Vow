@@ -382,6 +382,53 @@ function drawMira(c) {
 // Creature palettes, drawn from the reference sheet: a hunched forest goblin and
 // a heavier tusked brute plated with the stone it lives in.
 const CREATURE_PALETTE = {
+  /**
+   * The vault's people. Skin rather than hide, cloth rather than fur, and a
+   * blade that was made in a forge — they read as men at a glance, which is the
+   * whole point of putting them on a drowned coast instead of more beasts.
+   */
+  rogue: {
+    // Hooded, wrapped to the eyes, a dull knife held low.
+    hooded: {
+      outline: '#12131a', dark: '#2a2f3c', mid: '#3d4456', light: '#555d72',
+      belly: '#6b7389', rim: '#8b93a8', eye: '#e8e0c0', claw: '#cfd6dd', gum: '#5a3a42',
+      weapon: 'knife', mantle: '#232733', mantleLight: '#3a4152',
+    },
+    // Bare-armed, tattooed, a knife in each hand.
+    knifehand: {
+      outline: '#1a1410', dark: '#4a3a2e', mid: '#6d5642', light: '#997a58',
+      belly: '#c0a07a', rim: '#d8bd96', eye: '#ffd06a', claw: '#dfe6ea', gum: '#7d3d46',
+      weapon: 'knife', paint: '#2d4f6b',
+    },
+  },
+  bandit: {
+    // Boiled leather over a salt-stained shirt, a hatchet off a ship's rail.
+    leather: {
+      outline: '#161210', dark: '#452f22', mid: '#6a4a32', light: '#8f6c45',
+      belly: '#b39a72', rim: '#d0b98f', eye: '#ffc45e', claw: '#e4dccb', gum: '#7d3d46',
+      weapon: 'hatchet', mantle: '#3f2c20', mantleLight: '#6b4d34',
+    },
+    // Heavier, a jaw-strap of iron and a nose that has been broken twice.
+    ironjaw: {
+      outline: '#14161a', dark: '#333a40', mid: '#4f585f', light: '#6f7a82',
+      belly: '#94a0a6', rim: '#b4c0c6', eye: '#ffd06a', claw: '#dfe6ea', gum: '#5a3a42',
+      weapon: 'hatchet', paint: '#8a2f38', mantle: '#2a3036', mantleLight: '#49525a',
+    },
+  },
+  corsair: {
+    // The captain: a long coat gone green with salt, a tricorn, a cutlass.
+    captain: {
+      outline: '#101418', dark: '#1f3a34', mid: '#2f5a4c', light: '#457a63',
+      belly: '#8aa892', rim: '#b6cbb4', eye: '#ffd06a', claw: '#e8e2cf', gum: '#7d3d46',
+      weapon: 'cutlass', mantle: '#1b3129', mantleLight: '#356052', hat: true, sash: '#a3313c',
+    },
+    // The bosun: red coat, gold braid, and a cutlass he uses more than the captain does.
+    bosun: {
+      outline: '#160f12', dark: '#4a1f26', mid: '#6e2f36', light: '#94454a',
+      belly: '#c08a78', rim: '#dcae95', eye: '#ffc45e', claw: '#e8e2cf', gum: '#7d3d46',
+      weapon: 'cutlass', mantle: '#3a181e', mantleLight: '#6a2c34', hat: true, sash: '#d8b45a',
+    },
+  },
   wildling: {
     // The forest goblin: mossy hide, a spined back, a bone shiv.
     moss: {
@@ -518,6 +565,23 @@ function goblinBody(c, pal, stride, raise, lookX, back, breath) {
     poly(c, [[ax - 5, ay - 16 - raise * 6], [ax - 12, ay - 14 - raise * 6], [ax - 12, ay - 7 - raise * 6], [ax - 4, ay - 9 - raise * 6]], '#15161c');
     poly(c, [[ax - 5, ay - 15 - raise * 6], [ax - 11, ay - 13 - raise * 6], [ax - 11, ay - 8 - raise * 6], [ax - 5, ay - 10 - raise * 6]], '#7c848c');
     rect(c, ax - 11, ay - 13 - raise * 6, 1, 5, '#d8dde0');
+  } else if (pal.weapon === 'cutlass') {
+    // A broad curved blade with a shell guard, kept bright when nothing else is.
+    const tipY = ay - 30 - raise * 8;
+    rect(c, ax - 4, ay - 2, 4, 7, '#2a1d16');
+    c.strokeStyle = pal.outline; c.lineWidth = 5;
+    c.beginPath(); c.moveTo(ax - 2, ay - 3); c.quadraticCurveTo(ax - 16, ay - 18 - raise * 5, ax - 9, tipY); c.stroke();
+    c.strokeStyle = '#cfd8de'; c.lineWidth = 3;
+    c.beginPath(); c.moveTo(ax - 2, ay - 3); c.quadraticCurveTo(ax - 15, ay - 18 - raise * 5, ax - 9, tipY); c.stroke();
+    c.strokeStyle = '#fffaeb'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(ax - 3, ay - 5); c.quadraticCurveTo(ax - 14, ay - 19 - raise * 5, ax - 9, tipY + 2); c.stroke();
+    // The shell guard over the knuckles.
+    poly(c, [[ax - 1, ay - 1], [ax - 9, ay - 6], [ax - 8, ay + 3], [ax, ay + 4]], pal.outline);
+    poly(c, [[ax - 2, ay - 1], [ax - 8, ay - 5], [ax - 7, ay + 2], [ax - 1, ay + 3]], '#c9a24a');
+  } else if (pal.weapon === 'knife') {
+    poly(c, [[ax - 3, ay - 2], [ax - 7, ay - 17 - raise * 6], [ax - 1, ay - 2]], pal.outline);
+    poly(c, [[ax - 3, ay - 3], [ax - 6, ay - 15 - raise * 6], [ax - 2, ay - 3]], '#cfd8de');
+    rect(c, ax - 4, ay - 2, 4, 5, '#2a1d16');
   } else if (pal.weapon === 'claws') {
     for (let i = 0; i < 3; i++) {
       path(c, [[ax - 3 + i * 2, ay - 2], [ax - 6 + i * 3, ay - 12 - raise * 6 - (i === 1 ? 2 : 0)]], 2, pal.outline);
@@ -561,6 +625,20 @@ function goblinBody(c, pal, stride, raise, lookX, back, breath) {
   }
   path(c, [[-12, -14], [-12, -22], [-7, -28 - breath]], 1, pal.rim);
   path(c, [[-9, -46], [1, -49], [8, -45]], 1, pal.rim);
+  // A sash across the chest, for the ones who dress for it.
+  if (pal.sash) {
+    path(c, [[-11, -34 - breath], [9, -18]], 5, pal.outline);
+    path(c, [[-11, -34 - breath], [9, -18]], 3, pal.sash);
+  }
+  // The tricorn: three corners, a low brim, and nothing of the face under it.
+  if (pal.hat) {
+    const hy = -50;
+    poly(c, [[-16, hy + 4], [-6, hy - 3], [6, hy - 4], [17, hy + 3], [10, hy + 8], [-9, hy + 8]], pal.outline);
+    poly(c, [[-14, hy + 4], [-5, hy - 1], [5, hy - 2], [15, hy + 3], [9, hy + 6], [-8, hy + 6]], pal.mantle || pal.dark);
+    poly(c, [[-9, hy + 1], [0, hy - 8], [9, hy + 1], [4, hy + 3], [-4, hy + 3]], pal.outline);
+    poly(c, [[-7, hy + 1], [0, hy - 6], [7, hy + 1], [3, hy + 2], [-3, hy + 2]], pal.mantleLight || pal.mid);
+    rect(c, -2, hy - 5, 4, 3, pal.sash || '#c9a24a');
+  }
 }
 
 /** Slab-shouldered, stone-plated, swings something heavy. */
@@ -1005,6 +1083,17 @@ export function drawCritter(c, k) {
     ellipse(c, -7, -6 - hop, 3, 2, '#d8d2ba');
     rect(c, -3, -2 - hop * .4, 2, 3, '#4a3826');
     rect(c, 2, -2 - hop * .4, 2, 3, '#4a3826');
+  } else if (k.kind === 'lizard') {
+    if (k.fx < 0) c.scale(-1, 1);
+    const step = Math.sin(t * (run ? 28 : 3) + k.phase) * 2;
+    ellipse(c, 0, 1, 13, 3, '#00000044');
+    path(c, [[-5, -3], [-13, -2], [-20, -5 + step]], 3, '#8d7947');
+    for (const side of [-1, 1]) for (const x of [-5, 4])
+      path(c, [[x, -3], [x - 2 + step * side, -3 + side * 5], [x + 2 + step * side, -3 + side * 6]], 2, '#76633c');
+    ellipse(c, 0, -4, 9, 4, '#a99758');
+    ellipse(c, 9, -5, 5, 3, '#baaa6c');
+    path(c, [[-6, -5], [5, -5]], 1, '#d9cb89');
+    rect(c, 11, -7, 2, 2, '#251f16');
   } else if (k.kind === 'beetle') {
     const scuttle = Math.sin(t * (run ? 26 : 6) + k.phase) * 1.4;
     ellipse(c, 0, 1, 7, 2, '#00000055');
@@ -1161,7 +1250,8 @@ export function drawWildling(c, e) {
   const back = dist < k.chase && dy < -Math.abs(dx);
   if (dx < 0) c.scale(-1, 1);
   const breath = Math.round(Math.sin(game.time * 2.4 + e.homeX) * .8 + .8);
-  (e.kind === 'brute' ? bruteBody : goblinBody)(c, pal, stride, raise, dx < 0 ? -lookX : lookX, back, breath);
+  if (['rogue', 'bandit', 'corsair'].includes(e.kind)) vaultHumanBody(c, e, stride, raise, back, breath);
+  else (e.kind === 'brute' ? bruteBody : goblinBody)(c, pal, stride, raise, dx < 0 ? -lookX : lookX, back, breath);
   c.restore();
 
   if (e.hp < e.max) {
@@ -1169,6 +1259,83 @@ export function drawWildling(c, e) {
     rect(c, e.x - w / 2, e.y - 56 * k.scale, w, 3, '#231725');
     rect(c, e.x - w / 2, e.y - 56 * k.scale, w * e.hp / e.max, 3, '#e6b77c');
   }
+}
+
+/** Salt-starved survivors: upright human anatomy, patched cloth and salvaged steel. */
+function vaultHumanBody(c, e, stride, raise, back, breath) {
+  const rogue = e.kind === 'rogue', heavy = e.kind === 'bandit';
+  const skin = e.skin === 'knifehand' || e.skin === 'bosun' ? '#987052' : '#bc9473';
+  const shade = '#71513f', edge = '#211d1c';
+  const cloth = rogue ? '#646258' : heavy ? '#705747' : '#485f5b';
+  const light = rogue ? '#999581' : heavy ? '#9b8160' : '#74877a';
+  const width = heavy ? 11 : rogue ? 7 : 9;
+  // Long trouser legs and mismatched wrapped boots.
+  for (const side of [-1, 1]) {
+    const step = Math.round(stride * side * 4), x = side * 5;
+    path(c, [[x, -21], [x + step, -10], [x + step, -2]], 7, edge);
+    path(c, [[x, -21], [x + step, -10], [x + step, -3]], 4, '#5a554a');
+    rect(c, x + step - 3, -7, 6, 2, '#a1997e');
+    rect(c, x + step - 3, -3, 8, 4, '#302a25');
+  }
+  c.save(); c.translate(rogue ? 2 : 0, -breath * .5);
+  // A sloped shoulder line, waist and ragged coat tails.
+  poly(c, [[-width, -40], [width - 2, -39], [width + 2, -23], [width, -13],
+    [4, -16], [1, -12], [-2, -19], [-width - 2, -15], [-width, -27]], edge);
+  poly(c, [[-width + 1, -39], [width - 3, -38], [width, -24], [width - 1, -16],
+    [3, -19], [0, -15], [-3, -22], [-width, -18]], cloth);
+  path(c, [[-4, -37], [-2, -26], [-5, -19]], 2, light);
+  rect(c, 3, -28, 5, 6, '#a1987d');
+  path(c, [[4, -28], [6, -26], [4, -24]], 1, '#524a3b');
+  rect(c, -width, -24, width * 2, 3, '#3a3027');
+  rect(c, 1, -24, 3, 3, '#a18b62');
+  if (heavy) {
+    poly(c, [[-10, -38], [5, -36], [7, -28], [-8, -27]], '#4b4943');
+    path(c, [[-8, -36], [3, -34], [4, -30]], 2, '#848178');
+  }
+  // One slack arm; the weapon arm rises through the existing windup.
+  path(c, [[-width, -36], [-width - 4, -27], [-width - 2, -19]], 5, edge);
+  path(c, [[-width, -35], [-width - 3, -27], [-width - 2, -20]], 3, skin);
+  rect(c, -width - 5, -26, 5, 4, '#b0a68b');
+  const hx = width + 8 - raise * 4, hy = -22 - raise * 24;
+  path(c, [[width - 2, -36], [width + 5, -30 - raise * 8], [hx, hy]], 6, edge);
+  path(c, [[width - 2, -36], [width + 5, -30 - raise * 8], [hx, hy]], 3, skin);
+  // A narrow human head with ears, nose, stubble and tangled hair.
+  rect(c, -3, -43, 6, 6, shade);
+  rect(c, -6, -54, 12, 13, edge);
+  rect(c, -5, -52, 10, 10, skin);
+  rect(c, -7, -49, 2, 4, shade);
+  if (!back) {
+    rect(c, 4, -48, 3, 4, skin);
+    rect(c, -4, -49, 3, 1, '#483b32');
+    rect(c, 2, -49, 2, 1, '#332c27');
+    rect(c, 0, -46, 2, 3, shade);
+    rect(c, -3, -43, 7, 2, '#655445');
+    rect(c, 3, -47, 1, 4, '#d5b397');
+  }
+  poly(c, [[-7, -51], [-6, -56], [-2, -55], [1, -57], [6, -54], [6, -50], [2, -52], [-3, -52], [-4, -45], [-7, -43]], '#41372e');
+  if (back) rect(c, -5, -52, 10, 10, '#41372e');
+  if (rogue) {
+    path(c, [[-7, -42], [1, -39], [8, -42]], 5, '#a49b80');
+    poly(c, [[-6, -40], [-10, -29], [-6, -31], [-3, -39]], '#89816b');
+  } else if (!heavy) {
+    rect(c, -6, -53, 12, 3, '#8e6957');
+    path(c, [[-6, -52], [-10, -46], [-9, -39]], 2, '#8e6957');
+    path(c, [[-8, -36], [6, -25]], 2, '#b0a48a');
+  }
+  c.save(); c.translate(hx, hy); c.rotate(-raise * 1.8);
+  path(c, [[0, 3], [0, -8]], 3, '#4c3828');
+  if (heavy) {
+    rect(c, -1, -23, 3, 20, '#766044');
+    poly(c, [[0, -23], [10, -25], [12, -15], [2, -13]], '#787c77');
+    path(c, [[10, -24], [12, -15], [5, -14]], 2, '#b5b8a6');
+  } else {
+    const length = rogue ? 17 : 29;
+    poly(c, [[-2, -7], [-2, -length], [2, -length - 5], [3, -10]], '#a5aaa1');
+    path(c, [[2, -length - 3], [3, -10]], 1, '#e0ddc4');
+    rect(c, -5, -8, 10, 2, '#897653');
+  }
+  rect(c, -2, -1, 5, 4, skin);
+  c.restore(); c.restore();
 }
 
 const BONE = { edge: '#cfc8ac', shine: '#fff6d8', fuller: '#6d6350', grip: '#2a2230', guard: '#c9a94e' };

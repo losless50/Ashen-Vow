@@ -6,6 +6,8 @@ import { bossSpec } from '../systems/boss.js';
 import { QUARRY } from '../world/quarry.js';
 import { HEARTHWOOD_RIVER } from '../world/hearthwood.js';
 import { gateOpen, FAMILY_CAMP, groveDawned, REVELLERS } from '../world/grove.js';
+import { ECHO_VAULT_GATE, ECHO_VAULT_JAMBS, ECHO_VAULT_TORCHES, ECHO_VAULT_WALLS } from '../world/echo.js';
+import { SUNKEN, SUNKEN_FIRES, SUNKEN_TORCHES } from '../world/sunken.js';
 import { drawBlood } from '../systems/effects.js';
 import { rect, ellipse, poly, path, label } from './primitives.js';
 import { human, drawCreature, drawWarden, drawVaelira, drawArrow, drawCritter, drawHerald } from './actors.js';
@@ -41,8 +43,8 @@ function bush(c, t) {
   c.translate(Math.round(x + sway), Math.round(y));
   c.scale(s, s);
   ellipse(c, 2, 4, 22, 8, '#06100cb0');
-  for (const [ox, oy, r, col] of [[-9, -8, 12, '#0a1a14'], [8, -9, 11, '#0c1e18'], [0, -14, 12, '#12291f'], [-3, -6, 9, '#183328']]) ellipse(c, ox, oy, r, r * .8, col);
-  for (let i = 0; i < 9; i++) rect(c, -12 + (i * 7) % 24, -20 + (i * 5) % 16, 2, 1, i % 3 ? '#245040' : '#3a6a56');
+  for (const [ox, oy, r, col] of [[-9, -8, 12, '#0a1a14'], [8, -9, 11, '#0c1e18'], [0, -14, 12, '#12291f'], [-3, -6, 9, '#183328']]) ellipse(c, ox, oy, r, r * .8, t.desert ? ({'#0a1a14': '#555638', '#0c1e18': '#696b42', '#12291f': '#7b8050', '#183328': '#8c915c'}[col] || col) : col);
+  for (let i = 0; i < 9; i++) rect(c, -12 + (i * 7) % 24, -20 + (i * 5) % 16, 2, 1, t.desert ? '#b6b77c' : i % 3 ? '#245040' : '#3a6a56');
   rect(c, -1, -2, 2, 4, '#2a1e14');
   c.restore();
 }
@@ -50,6 +52,7 @@ function bush(c, t) {
 export function tree(c, t) {
   if (t.bush) { bush(c, t); return; }
   if (t.regrow > 0) { stump(c, t); return; }
+  if (t.kind === 'palm') { deadPalm(c, t); return; }
   const { x, y, s } = t;
   c.save();
   c.translate(Math.round(x), Math.round(y));
@@ -279,6 +282,279 @@ function groveFire(c, x, y) {
   for (let i = 0; i < 5; i++) rect(c, x + Math.sin(i + game.time) * 8, y - 20 - ((game.time * 16 + i * 9) % 40), 2, 2, '#eec586');
 }
 
+
+/**
+ * A dead palm on the vault's sand: a leaning bleached trunk with a few fronds
+ * left on it, all of them hanging. Nothing here has been watered in a long time.
+ */
+function deadPalm(c, t) {
+  const { x, y } = t;
+  const lean = ((x + y) % 9) - 4, h = 74 + ((x * 7 + y) % 5) * 14;
+  const sway = Math.sin(game.time * .7 + x * .01) * 2;
+  ellipse(c, x, y + 4, 20, 8, '#00000055');
+  // Trunk, ringed the way a palm is.
+  const top = [x + lean + sway, y - h];
+  path(c, [[x, y], [x + lean * .5, y - h * .5], top], 9, '#6b5a45');
+  path(c, [[x, y], [x + lean * .5, y - h * .5], top], 5, '#8d7a5e');
+  for (let i = 1; i < 7; i++) {
+    const k = i / 7;
+    const rx = x + lean * k + sway * k, ry = y - h * k;
+    path(c, [[rx - 5, ry], [rx + 5, ry]], 1, '#5a4b39');
+  }
+  // Fronds, every one of them drooping.
+  for (let i = 0; i < 6; i++) {
+    const a = -Math.PI / 2 + (i - 2.5) * .62;
+    const ex = top[0] + Math.cos(a) * 34, ey = top[1] + Math.sin(a) * 20 + 20;
+    path(c, [top, [top[0] + Math.cos(a) * 20, top[1] + Math.sin(a) * 13], [ex, ey]], 3, '#5f6b45');
+    path(c, [top, [top[0] + Math.cos(a) * 20, top[1] + Math.sin(a) * 13], [ex, ey]], 1.4, '#87945e');
+  }
+  if (t.lush) {
+    for (const side of [-1, 1]) for (let i = 0; i < 4; i++) {
+      const dx = side * (30 + i * 7), dy = -18 + i * 12;
+      poly(c, [top, [top[0] + dx * .6, top[1] + dy - 12],
+        [top[0] + dx, top[1] + dy + 14], [top[0] + dx * .55, top[1] + dy]], i % 2 ? '#637c40' : '#405e35');
+      path(c, [top, [top[0] + dx * .6, top[1] + dy - 5], [top[0] + dx, top[1] + dy + 14]], 1, '#a1ad61');
+    }
+  }
+  rect(c, top[0] - 4, top[1] - 4, 8, 8, '#6b5a45');
+}
+
+// --- the Sunken Vault -------------------------------------------------------------
+/** A standing column: a fluted shaft with its capital broken off at an angle. */
+function column(c, x, y, h, tilt) {
+  const top = y - h;
+  ellipse(c, x, y + 6, 26, 12, '#00000055');
+  poly(c, [[x - 15, y], [x - 13 + tilt, top], [x + 13 + tilt, top], [x + 15, y]], '#4a463c');
+  poly(c, [[x - 12, y], [x - 10 + tilt, top], [x + 4 + tilt, top], [x + 5, y]], '#6e6a60');
+  poly(c, [[x - 6, y], [x - 4 + tilt, top], [x + 1 + tilt, top], [x, y]], '#8b867a');
+  for (let i = 1; i < 5; i++) {
+    const t = i / 5;
+    path(c, [[x - 13 + tilt * t, y - h * t], [x + 13 + tilt * t, y - h * t]], 1, '#3e3a32');
+  }
+  // The break at the top, never level.
+  poly(c, [[x - 14 + tilt, top], [x + 14 + tilt, top], [x + 9 + tilt, top - 7], [x - 6 + tilt, top - 3]], '#7d786c');
+  // The waterline stain, where it has stood in the shallows a long time.
+  path(c, [[x - 14, y - 26], [x + 14, y - 26]], 3, '#2b5f6855');
+}
+
+function vaultTorch(c, x, y) {
+  ellipse(c, x, y + 3, 10, 4, '#090d1688');
+  rect(c, x - 4, y - 40, 8, 44, '#3b3633');
+  rect(c, x - 2, y - 39, 3, 41, '#837051');
+  rect(c, x - 8, y - 44, 16, 6, '#4a4641');
+  const flick = Math.sin(game.time * 13 + x) * 3;
+  poly(c, [[x - 6,y - 44],[x - 8,y - 54],[x - 2,y - 50],[x + 2,y - 68 + flick],[x + 7,y - 53],[x + 5,y - 43]], '#dc7c3f');
+  poly(c, [[x - 3,y - 44],[x,y - 59 + flick],[x + 4,y - 47]], '#ffe1a0');
+  rect(c, x - 1, y - 50, 3, 6, '#fff2c4');
+}
+
+/** The great arch in the south wall: the way the world map arrives. */
+function southArch(c, x, y) {
+  ellipse(c, x, y + 10, 130, 30, '#00000055');
+  poly(c, [[x - 118, y], [x - 118, y - 150], [x + 118, y - 150], [x + 118, y]], '#3c3830');
+  poly(c, [[x - 104, y], [x - 104, y - 150], [x + 104, y - 150], [x + 104, y]], '#5c584e');
+  // The opening, and the dark that is always in it.
+  c.beginPath();
+  c.moveTo(x - 62, y);
+  c.lineTo(x - 62, y - 96);
+  c.quadraticCurveTo(x, y - 190, x + 62, y - 96);
+  c.lineTo(x + 62, y);
+  c.closePath();
+  c.fillStyle = '#0d1416';
+  c.fill();
+  for (let i = -2; i <= 2; i++) rect(c, x + i * 42 - 6, y - 168, 12, 22, '#4a463c');
+  path(c, [[x - 118, y - 150], [x + 118, y - 150]], 6, '#6e6a60');
+  label(c, x, y - 206, 'THE DROWNED GATE', '#9fb6c8', 8);
+}
+
+/** One run of the vault wall: a slab of coursed stone standing up off its footprint. */
+function vaultWallSlab(c, w) {
+  const top = w.y0 - w.h, wide = w.x1 - w.x0;
+  rect(c, w.x0, top, wide, w.y1 - top, '#343e3c');
+  rect(c, w.x0 + 3, top + 8, wide - 6, w.y1 - top - 14, '#586353');
+  for (let wy = top + 22; wy < w.y1; wy += 22) {
+    path(c, [[w.x0 + 2, wy], [w.x1 - 2, wy]], 2, '#35483f');
+    for (let wx = w.x0 + (wy % 44 ? 16 : 34); wx < w.x1; wx += 40)
+      path(c, [[wx, wy - 20], [wx, wy]], 2, '#3e4c42');
+  }
+  rect(c, w.x0 - 3, top, wide + 6, 8, '#959979');
+  rect(c, w.x0, w.y1 - 5, wide, 5, '#334f42');
+}
+
+/** Where a leaf lies when it is thrown back: flat along the wall's west face. */
+const LEAF_X = 2806;
+
+/** A gate leaf thrown back flat against the wall's west face and left there. */
+function vaultGateLeaf(c, x, y0, y1) {
+  rect(c, x, y0, 17, y1 - y0, '#241d18');
+  rect(c, x + 2, y0 + 3, 13, y1 - y0 - 6, '#4a3b2a');
+  for (let ty = y0 + 7; ty < y1 - 6; ty += 15) path(c, [[x + 3, ty], [x + 13, ty]], 2, '#332719');
+  for (const by of [y0 + 14, y1 - 24]) { rect(c, x - 2, by, 21, 5, '#2b3330'); rect(c, x - 2, by + 1, 21, 2, '#6d7a6b'); }
+  rect(c, x + 15, (y0 + y1) / 2 - 5, 5, 10, '#7d8a78');
+  path(c, [[x + 6, y1 - 6], [x + 1, y1 - 32], [x + 9, y1 - 58]], 2, '#3f604b');
+}
+
+/**
+ * The standing half of the gate, north of the road. Everything tall lives here,
+ * because stone north of him draws behind him — the walk through is never hidden.
+ */
+function vaultGateNorth(c) {
+  const { x } = ECHO_VAULT_GATE, jamb = ECHO_VAULT_JAMBS.north;
+  for (const w of ECHO_VAULT_WALLS) if (w.y1 <= jamb) vaultWallSlab(c, w);
+  // The pier: heavier stone at the wall's end, where the arch sprang from.
+  rect(c, x - 36, jamb - 226, 72, 226, '#2f3a38');
+  rect(c, x - 31, jamb - 219, 61, 217, '#626d5c');
+  for (let course = 0; course < 8; course++) {
+    const dy = jamb - 200 + course * 26, joint = course % 2 ? -10 : 12;
+    path(c, [[x - 30, dy], [x + 29, dy]], 2, '#3a4a41');
+    path(c, [[x + joint, dy - 24], [x + joint, dy]], 2, '#485648');
+  }
+  rect(c, x - 43, jamb - 240, 86, 14, '#a9a885');
+  rect(c, x - 43, jamb - 240, 86, 4, '#c6c39a');
+  // The springing of the arch, reaching out over the road and broken short.
+  poly(c, [[x - 30, jamb - 6], [x + 30, jamb - 6], [x + 40, jamb + 30], [x + 16, jamb + 52], [x - 22, jamb + 46]], '#4d574d');
+  poly(c, [[x - 26, jamb - 2], [x + 26, jamb - 2], [x + 33, jamb + 26], [x + 13, jamb + 43], [x - 19, jamb + 38]], '#6d7764');
+  for (const [vx, vy] of [[-16, 10], [4, 16], [22, 26]]) path(c, [[x + vx, jamb], [x + vx + 4, jamb + vy + 16]], 2, '#41513f');
+  // The mark cut over the way through, and the lamp the wardens left burning.
+  poly(c, [[x, jamb - 206], [x + 11, jamb - 190], [x, jamb - 174], [x - 11, jamb - 190]], '#8fceb5');
+  rect(c, x - 3, jamb - 172, 6, 26, '#496f62');
+  vaultGateLeaf(c, LEAF_X, jamb - 124, jamb - 6);
+  if (!game.cinematic) label(c, x, jamb - 254, 'THE DROWNED GATE', '#9fb6c8', 8);
+}
+
+/**
+ * The fallen half, south of the road. Kept low on purpose: stone south of him
+ * draws over him, so none of it is allowed to reach up across the passage.
+ */
+function vaultGateSouth(c) {
+  const { x } = ECHO_VAULT_GATE, jamb = ECHO_VAULT_JAMBS.south;
+  for (const w of ECHO_VAULT_WALLS) if (w.y1 > ECHO_VAULT_JAMBS.north) vaultWallSlab(c, w);
+
+  // The southern pier, snapped off where the arch came down. Nothing here is
+  // drawn above the passage floor: see ECHO_VAULT_WALLS.
+  rect(c, x - 36, jamb - 80, 72, 80, '#2f3a38');
+  rect(c, x - 31, jamb - 72, 61, 70, '#5b6656');
+  for (let dy = jamb - 54; dy < jamb; dy += 26) path(c, [[x - 30, dy], [x + 29, dy]], 2, '#3a4a41');
+  poly(c, [[x - 39, jamb - 80], [x - 6, jamb - 79], [x + 18, jamb - 72], [x + 40, jamb - 78], [x + 40, jamb - 64], [x - 39, jamb - 66]], '#8e907a');
+  path(c, [[x + 20, jamb - 62], [x + 14, jamb - 38], [x + 22, jamb - 10]], 3, '#3f604b');
+  vaultGateLeaf(c, LEAF_X, jamb + 6, jamb + 124);
+  // The crown of the arch, lying where it dropped. The water round it is ground,
+  // and is painted with the rest of the threshold.
+  const cx = x + 6, cy = ECHO_VAULT_GATE.y + 88;
+  poly(c, [[cx - 32, cy + 8], [cx - 26, cy - 14], [cx + 20, cy - 18], [cx + 32, cy + 2], [cx + 22, cy + 12], [cx - 18, cy + 14]], '#2f3a38');
+  poly(c, [[cx - 27, cy + 4], [cx - 22, cy - 11], [cx + 17, cy - 14], [cx + 26, cy], [cx + 17, cy + 8], [cx - 15, cy + 9]], '#737c66');
+  for (const dx of [-14, 2, 16]) path(c, [[cx + dx, cy - 13], [cx + dx - 2, cy + 8]], 2, '#4a5548');
+}
+
+/** Water coming off the eastern cliffs into the halls, in moving bands. */
+function waterfall(c, x, y) {
+  const t = game.time;
+  poly(c, [[x - 26, y - 80], [x + 26, y - 80], [x + 34, y + 20], [x - 34, y + 20]], '#9fc4cc55');
+  for (let i = 0; i < 9; i++) {
+    const k = ((t * .5 + i / 9) % 1);
+    c.globalAlpha = .35 + Math.sin(k * Math.PI) * .35;
+    rect(c, x - 24 + (i % 4) * 13, y - 80 + k * 100, 5, 18 + (i % 3) * 8, '#dff0f4');
+    c.globalAlpha = 1;
+  }
+  // The churn where it lands.
+  for (let i = 0; i < 7; i++) {
+    const k = (t * 1.6 + i / 7) % 1;
+    c.globalAlpha = .5 * (1 - k);
+    ellipse(c, x + Math.sin(i * 2.1) * 26, y + 20, 8 + k * 26, 4 + k * 11, '#cfe6ec');
+    c.globalAlpha = 1;
+  }
+}
+
+/** The two seats at the middle, and the water standing in the court before them. */
+function drownedThrone(c) {
+  const { x, y } = SUNKEN.throne;
+  for (const [sx, tilt] of [[-74, -1], [74, 1]]) {
+    const tx = x + sx, ty = y - 66;
+    ellipse(c, tx, ty + 30, 40, 16, '#00000055');
+    poly(c, [[tx - 30, ty + 30], [tx - 26, ty - 40], [tx + 26, ty - 40], [tx + 30, ty + 30]], '#3c3830');
+    poly(c, [[tx - 24, ty + 26], [tx - 21, ty - 34], [tx + 21, ty - 34], [tx + 24, ty + 26]], '#6e6a60');
+    rect(c, tx - 26, ty + 4, 52, 9, '#57534a');
+    // A crown-back, broken on one side.
+    for (let i = -2; i <= 2; i++) rect(c, tx + i * 10 - 3 + tilt * 2, ty - 50 + Math.abs(i) * 5, 6, 14, '#7d786c');
+    path(c, [[tx - 24, ty - 12], [tx + 24, ty - 12]], 2, '#2b5f6855');
+  }
+
+}
+
+/**
+ * Something moving under the surface. Never a fish — only the shadow of one,
+ * drawn straight onto the water with no outline and no detail, because that is
+ * all you would see of it from a causeway. They circle a fixed patch of open
+ * water and cannot be reached, fought, or followed out of it.
+ */
+function swimmer(c, w) {
+  const t = game.time * w.speed + w.phase;
+  const x = w.x + Math.cos(t) * w.r;
+  const y = w.y + Math.sin(t) * w.r * .62;
+  // Facing is simply the way it is going round.
+  const a = Math.atan2(Math.cos(t) * .62, -Math.sin(t));
+  c.save();
+  c.translate(x, y);
+  c.rotate(a);
+  c.scale(w.size, w.size);
+  // Deeper things are fainter. Nothing here is ever fully solid.
+  c.globalAlpha = .1 + (1 - w.depth) * .3;
+  const ink = '#04161c';
+  if (w.kind === 'shark') {
+    // A long body, a dorsal, and a tail that sweeps.
+    const sweep = Math.sin(game.time * 2.4 + w.phase) * 5;
+    poly(c, [[-26, 0], [-6, -7], [16, -4], [26, 0], [16, 4], [-6, 7]], ink);
+    poly(c, [[-2, -6], [4, -15], [8, -5]], ink);
+    poly(c, [[-24, 0], [-34, -9 + sweep], [-30, 0], [-34, 9 + sweep]], ink);
+    poly(c, [[0, 5], [-6, 13], [6, 7]], ink);
+  } else if (w.kind === 'ray') {
+    // A flat diamond with wings that beat slowly.
+    const beat = Math.sin(game.time * 1.6 + w.phase) * 4;
+    poly(c, [[18, 0], [-2, -16 - beat], [-16, 0], [-2, 16 + beat]], ink);
+    poly(c, [[-14, 0], [-30, 2], [-14, 3]], ink);
+  } else {
+    const sweep = Math.sin(game.time * 5 + w.phase) * 3;
+    poly(c, [[-11, 0], [-2, -4], [9, -2], [13, 0], [9, 2], [-2, 4]], ink);
+    poly(c, [[-10, 0], [-17, -5 + sweep], [-15, 0], [-17, 5 + sweep]], ink);
+  }
+  c.restore();
+  c.globalAlpha = 1;
+  // The dimple it pushes along the surface above it.
+  c.globalAlpha = .07;
+  ellipse(c, x, y - 3, 14 * w.size, 5 * w.size, '#cfe6ec');
+  c.globalAlpha = 1;
+}
+
+/** A roofless house on the vault's sand: three walls left, and none of them whole. */
+function ruinHouse(c, b) {
+  const { x, y, w, h } = b;
+  const back = y - h / 2, front = y + h / 2, left = x - w / 2, right = x + w / 2;
+  // Back wall, tallest, with the gable half gone.
+  poly(c, [[left, back], [left, back - 52], [x - 4, back - 70], [right - 10, back - 40], [right, back]], '#8a7a5e');
+  poly(c, [[left + 5, back - 4], [left + 5, back - 46], [x - 6, back - 62], [right - 16, back - 36], [right - 6, back - 4]], '#a8956f');
+  // Side walls, lower, broken along the top.
+  for (const [sx, dir] of [[left, 1], [right, -1]]) {
+    poly(c, [[sx, back], [sx, back - 44], [sx + dir * 6, front - 12], [sx, front]], '#7a6d57');
+    poly(c, [[sx + dir * 4, back - 4], [sx + dir * 4, back - 38], [sx + dir * 9, front - 16], [sx + dir * 4, front - 4]], '#97865f');
+  }
+  // A doorway in the front, and the dark inside it.
+  rect(c, x - 13, front - 34, 26, 34, '#2a241c');
+  rect(c, x - 10, front - 30, 20, 30, '#17130f');
+  // Sand drifted up against the windward side.
+  ellipse(c, left - 6, front - 6, 22, 9, '#c9b48a');
+}
+
+/** Everything standing above the vault's ground. */
+function vaultProps(c) {
+  // Under the water first, so everything standing on the stone is over them.
+  for (const w of props.swimmers) swimmer(c, w);
+  for (const f of SUNKEN.falls) waterfall(c, f.x, f.y);
+
+  // The mini-boss mouths, named on the ground so they read from a distance.
+  label(c, SUNKEN.depths.x, SUNKEN.depths.y + 54, 'THE SCORCHED DEPTHS', '#e0a06a', 8);
+  label(c, SUNKEN.halls.x, SUNKEN.halls.y + 58, 'THE FLOODED HALLS', '#9fc4cc', 8);
+  label(c, SUNKEN.village.x, SUNKEN.village.y - 54, 'ABANDONED VILLAGE', '#cbb894', 8);
+}
 
 /**
  * One of the celebrants. The sprite is the grove's own wolf or mushroom-folk —
@@ -816,12 +1092,14 @@ function brazier(c, x, y) {
 export function drawWild(c) {
   c.drawImage(world.terrain, 0, 0);
   const grove = game.region === 'echo';
+  const vault = game.region === 'sunken';
   if (grove) groveProps(c);
+  else if (vault) vaultProps(c);
   else { flowingRiver(c); }
   drawBlood(c);
   drawHazards(c);
   drawLostEmbers(c);
-  if (!grove) {
+  if (!grove && !vault) {
     camp(c);
     quarryProps(c);
     for (const l of lamps) lantern(c, l.x, l.y);
@@ -829,6 +1107,21 @@ export function drawWild(c) {
   }
 
   const sprites = [
+    ...(grove ? [
+      // Two pieces, sorted apart, so the wall north of the road stays behind him
+      // and the wall south of it stays in front — the way through is always clear.
+      { y: ECHO_VAULT_JAMBS.north, draw: () => vaultGateNorth(c) },
+      { y: Math.max(...ECHO_VAULT_WALLS.map(w => w.y1)), draw: () => vaultGateSouth(c) },
+      ...ECHO_VAULT_TORCHES.map(t => ({ y: t.y, draw: () => vaultTorch(c, t.x, t.y) })),
+    ] : []),
+    ...(vault ? [
+      ...SUNKEN_FIRES.map(f => ({ y: f.y + 4, draw: () => groveFire(c, f.x, f.y) })),
+      ...SUNKEN_TORCHES.map(t => ({ y: t.y, draw: () => vaultTorch(c, t.x, t.y) })),
+      ...SUNKEN.houses.map(b => ({ y: b.y + b.h / 2, draw: () => ruinHouse(c, b) })),
+      ...SUNKEN.colonnade.map(([x, y]) => ({ y, draw: () => column(c, x, y, 80 + ((x + y) % 5) * 14, (x % 7) - 3) })),
+      { y: SUNKEN.throne.y - 36, draw: () => drownedThrone(c) },
+      { y: SUNKEN.gate.y - 40, draw: () => southArch(c, SUNKEN.gate.x, SUNKEN.gate.y - 40) },
+    ] : []),
     ...trees.map(t => ({ y: t.y, draw: () => tree(c, t) })),
     ...veins.map(v => ({ y: v.y, draw: () => oreVein(c, v) })),
     ...npcs.filter(n => n.type === 'mira' || n.type === 'smith' || n.type === 'peddler').map(n => ({
@@ -877,6 +1170,7 @@ export function drawWild(c) {
 
   for (const a of entities.shots) drawArrow(c, a);
   if (grove) { fireflies(c, props.fireflies); rain(c); return; }
+  if (vault) return;
   rain(c);
   // Leaves carried on the wind — gusts come and go — and a few sunlit motes.
   const gust = 26 + Math.sin(game.time * .35) * 16 + Math.sin(game.time * 1.9) * 4;

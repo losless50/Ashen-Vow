@@ -1,0 +1,32 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Sunken Vault · environment study</title>
+<style>
+body{margin:0;background:#202923;color:#d8cba7;font:14px monospace}nav{padding:16px;display:flex;gap:16px;align-items:center}a{color:#b4c69b}canvas{display:block;image-rendering:pixelated;margin:auto;max-width:100%}#shell{display:none}
+</style>
+<nav>THE SUNKEN VAULT <a href="?view=all">Overview</a><a href="?view=village">Village</a><a href="?view=temple">Temple</a><a href="?view=gardens">Gardens</a><a href="?view=court">Court</a><a href="?view=entrance">Vault gate</a><a href="/">Play</a></nav>
+<div id="shell"></div><canvas id="preview" width="1500" height="1300"></canvas>
+<script type="module">
+// Supply the game's DOM hooks without starting gameplay or touching save data.
+const html = await (await fetch('/index.html')).text();
+const doc = new DOMParser().parseFromString(html, 'text/html');
+doc.querySelectorAll('script').forEach(el => el.remove());
+document.getElementById('shell').append(...doc.body.children);
+const [{game, player, camera}, world, {drawWild}] = await Promise.all([
+  import('../src/core/state.js'), import('../src/world/world.js'), import('../src/render/scenes.js'),
+]);
+const view=new URLSearchParams(location.search).get('view');
+world.enterRegion(view === 'entrance' ? 'echo' : 'sunken');
+const {entities}=await import('../src/systems/entities.js');
+entities.enemies=[];
+game.scene='wild'; game.cinematic=view!=='entrance';
+// The grove-side gate is judged with him standing in it, so park him on the road.
+if (view==='entrance'){player.x=2812;player.y=1756;player.face=0;} else {player.x=1500;player.y=2320;}
+const views={entrance:[2380,1430,1.75],all:[0,0,.5],village:[140,500,1.6],temple:[1010,100,1.5],gardens:[1900,650,1.5],court:[1080,950,1.6]};
+const {atmosphere}=await import('../src/render/lighting.js');
+const [x,y,scale]=views[view]||views.all;
+const canvas=document.getElementById('preview'), c=canvas.getContext('2d');
+Object.assign(camera,{x,y,w:1500/scale,h:1300/scale});
+function frame(t){game.time=t/1000;c.setTransform(1,0,0,1,0,0);c.clearRect(0,0,1500,1300);c.imageSmoothingEnabled=false;c.scale(scale,scale);c.translate(-x,-y);drawWild(c);atmosphere(c);requestAnimationFrame(frame)}
+requestAnimationFrame(frame);
+</script>

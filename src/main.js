@@ -109,6 +109,14 @@ on('enteredPlay', () => setTimeout(() => {
 // (`?grove=cave` at the cave mouth, with the three Fallen already down).
 const devFlags = new URLSearchParams(location.search);
 if (devFlags.has('map')) goToScreen('play', { instant: true }).then(openMap);
+// `?vault` drops into the Sunken Vault, which needs Vaelira down to reach on foot.
+if (devFlags.has('vault')) goToScreen('play', { instant: true }).then(() => {
+  progress.bosses.vaelira = true;
+  if (!progress.opened.includes('grove-dawn')) progress.opened.push('grove-dawn');
+  const at = { gate: { x: 1500, y: 2300 }, throne: { x: 1500, y: 1680 }, depths: { x: 1560, y: 520 },
+    halls: { x: 2360, y: 1700 }, village: { x: 520, y: 900 } }[devFlags.get('vault')] || { x: 150, y: 1500 };
+  crossTo('sunken', at);
+});
 if (devFlags.has('grove')) goToScreen('play', { instant: true }).then(() => {
   if (devFlags.has('lamp') && !progress.owned.includes('lantern')) progress.owned.push('lantern');
   if (devFlags.get('grove') === 'cave') { for (const id of ['greymane', 'sporemother', 'mycel']) if (!progress.slain.includes(id)) progress.slain.push(id); }

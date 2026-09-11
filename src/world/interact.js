@@ -431,17 +431,19 @@ function caveMouth() {
   });
 }
 
-function fire() {
+function fire(site) {
   const grove = game.region === 'echo';
   showDialog({
     tag: grove ? 'A FIRE IN THE DARK' : 'A MOMENT OF RESPITE',
-    title: grove ? 'Rest at the grove fire.' : 'Rest beside the hearth.',
-    body: grove
+    title: game.region === 'sunken' ? `Rest at the ${site.name.toLowerCase()}.` : grove ? 'Rest at the grove fire.' : 'Rest beside the hearth.',
+    body: game.region === 'sunken'
+      ? 'A little warmth among the drowned stones. Refill vitality, stamina and flasks. Resting restores the wilds and makes this your return point, even after leaving the vault.'
+      : grove
       ? 'A small fire the last travellers left, ringed with stones. Refill your vitality, stamina and flasks. Resting wakes the grove again — the wolves and the mushroom-folk, though not the Fallen.\n\nSit here once and the hearth charm will remember this fire.'
       : 'Refill your vitality, stamina, and healing flasks. Resting also regrows the wilds — trees, ironstone veins, and the creatures that guard them.\n\nGathered materials, camp buildings, attributes and weapon upgrades are kept.',
     extra: `✦ ${progress.embers} embers held`,
     actions: [
-      { label: 'Rest & replenish', run: () => { rest(); closeDialog(); } },
+      { label: 'Rest & replenish', run: () => { rest(site); closeDialog(); } },
       ...(canTravel() ? [{ label: 'Travel · the map', run: openMap }] : []),
       { label: 'Kindle · spend embers', run: kindleMenu },
       { label: 'Character sheet', run: statsSheet },

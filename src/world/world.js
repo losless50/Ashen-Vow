@@ -3,6 +3,7 @@ import { rand } from '../core/rng.js';
 import { paintTerrain } from './terrain.js';
 import { VEIN_SPOTS, inQuarry } from './quarry.js';
 import { buildEcho } from './echo.js';
+import { buildSunken } from './sunken.js';
 import { onHearthwoodRoad } from './hearthwood.js';
 import { debris } from '../systems/effects.js';
 import { groveDawned } from './grove.js';
@@ -26,7 +27,7 @@ export const SOLIDS = [];
  * the new region simply does not mention keeps whatever the last one put there,
  * and the grove's rain follows you home to Hearthwood.
  */
-const NO_PROPS = { mushrooms: [], fireflies: 0, pools: [], lairs: [], cave: null, cookfire: null, sporehouse: null, burrow: null, huts: [], wayposts: [], camps: [], gibbets: [], rack: null, critters: [], rain: 0, ruins: [], stones: [] };
+const NO_PROPS = { mushrooms: [], fireflies: 0, pools: [], lairs: [], cave: null, cookfire: null, sporehouse: null, burrow: null, huts: [], wayposts: [], camps: [], gibbets: [], rack: null, critters: [], swimmers: [], waterGlow: null, waterMotes: [], rain: 0, ruins: [], stones: [] };
 export const props = { ...NO_PROPS };
 export let terrain = null;
 /** The region's map as painted. `terrain` may be showing a variant of it. */
@@ -51,6 +52,7 @@ export function showDaylight(on) {
 }
 let groundContext = null;
 let inWater = () => false;
+let terrainBlocked = () => false;
 export let bounds = { minX: 50, maxX: 1450, minY: 120, maxY: 1040 };
 /** The region's pixel size; the camera and the painters stop at its edge. */
 export let size = { w: W, h: H };
@@ -110,7 +112,8 @@ function buildHearthwood() {
 }
 
 const REGION_DATA = { hearthwood: buildHearthwood() };
-const regionData = key => (REGION_DATA[key] ??= key === 'echo' ? buildEcho(TREE) : REGION_DATA.hearthwood);
+const BUILDERS = { echo: () => buildEcho(TREE), sunken: buildSunken };
+const regionData = key => (REGION_DATA[key] ??= BUILDERS[key] ? BUILDERS[key]() : REGION_DATA.hearthwood);
 
 /** Swaps the live world to a region. Trees keep their regrowth state per region. */
 export function enterRegion(key) {
@@ -124,11 +127,23 @@ export function enterRegion(key) {
   // is currently being shown, so grass stays grass under any weather.
   groundContext = painted.getContext('2d', { willReadFrequently: true });
   inWater = d.inWater;
+  terrainBlocked = d.terrainBlocked || (() => false);
   bounds = d.bounds;
   size = d.size || { w: W, h: H };
   exits = d.exits;
-  fire = d.fire;
+  fire = npcs.find(n => n.type === 'fire' && n.id && n.id === progress.restSites?.[d.key]) || d.fire;
   showDaylight(key === 'echo' && groveDawned());
+}
+
+/** Resting at a named fire also selects the region's return point. */
+export function rememberFire(site) {
+  const fires = npcs.filter(n => n.type === 'fire');
+  const chosen = fires.includes(site) ? site : fires.reduce((best, n) =>
+    !best || Math.hypot(n.x - player.x, n.y - player.y) < Math.hypot(best.x - player.x, best.y - player.y) ? n : best, null);
+  if (!chosen?.id) return;
+  progress.restSites ??= {};
+  progress.restSites[game.region] = chosen.id;
+  fire = chosen;
 }
 
 /** The exit the wanderer is standing in, if any. */
@@ -151,7 +166,7 @@ export function groundAt(x, y) {
 
 // --- collision ----------------------------------------------------------------
 export function blocked(x, y, radius = TREE.radius) {
-  if (inWater(x, y)) return true;
+  if (inWater(x, y) || terrainBlocked(x, y, radius)) return true;
   for (const s of SOLIDS) {
     if (s.needs && !progress.buildings[s.needs]) continue;
     if (((x - s.x) / (s.rx + radius)) ** 2 + ((y - s.y) / (s.ry + radius)) ** 2 < 1) return true;
@@ -245,6 +260,7 @@ function updateCritters(dt) {
         // Back on its patch, a little way off from where it was.
         k.x = k.homeX + (Math.random() - .5) * 120;
         k.y = k.homeY + (Math.random() - .5) * 90;
+        if (game.region === 'sunken' && blocked(k.x, k.y, 8)) { k.x = k.homeX; k.y = k.homeY; }
         k.alpha = 0;
         k.flee = 0;
       }
@@ -255,8 +271,9 @@ function updateCritters(dt) {
     if (k.flee > 0) {
       k.flee -= dt;
       const speed = k.kind === 'hare' ? 210 : k.kind === 'beetle' ? 120 : 90;
-      k.x += k.fx * speed * dt;
-      k.y += k.fy * speed * dt;
+      const nx = k.x + k.fx * speed * dt, ny = k.y + k.fy * speed * dt;
+      if (game.region !== 'sunken' || !blocked(nx, ny, 8)) { k.x = nx; k.y = ny; }
+      else k.flee = Math.min(k.flee, .3);
       k.alpha = Math.max(0, k.flee / .5);
       if (k.flee <= 0) { k.alpha = 0; k.back = 8 + Math.random() * 14; }
     } else if (d < 130) {

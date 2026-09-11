@@ -13,6 +13,12 @@ export const ENEMY_KINDS = {
   sporeling: { hp: 200, damage: 44, speed: 40, chase: 200, hold: 46, strike: 64, hitRange: 88, windup: .9,  cool: 1.9, embers: 35, scale: 1.1,  radius: 15, spore: true },
   // Pond frogs: weak, easily killed, and back within half a minute.
   frog:      { hp: 26,  damage: 11, speed: 34, chase: 230, hold: 150, strike: 210, hitRange: 0, windup: .7, cool: 2.2, embers: 6,  scale: .85, radius: 9, spit: true, respawn: 30 },
+  // The Sunken Vault. Men, not beasts: whoever is still picking over a drowned
+  // kingdom. They fight like people — the rogue darts, the bandit trades, the
+  // corsair swings a cutlass and takes his time about it.
+  rogue:     { hp: 96,  damage: 28, speed: 104, chase: 260, hold: 34, strike: 64, hitRange: 56, windup: .38, cool: .95, embers: 28, scale: .98, radius: 12, lunge: 260 },
+  bandit:    { hp: 150, damage: 38, speed: 72,  chase: 250, hold: 44, strike: 62, hitRange: 70, windup: .62, cool: 1.35, embers: 40, scale: 1.1,  radius: 15 },
+  corsair:   { hp: 210, damage: 50, speed: 66,  chase: 270, hold: 48, strike: 70, hitRange: 86, windup: .8,  cool: 1.6, embers: 58, scale: 1.24, radius: 17 },
 };
 
 /** The grove's three Fallen: named, big, and each dies once. The cave opens when all are down. */
@@ -25,6 +31,9 @@ export const SKIN_KEYS = {
   brute: ['quarry', 'ironback'],
   wolf: ['grey', 'black', 'pale', 'alpha', 'grafted'],
   sporeling: ['teal', 'violet', 'amber', 'mother'],
+  rogue: ['hooded', 'knifehand'],
+  bandit: ['leather', 'ironjaw'],
+  corsair: ['captain', 'bosun'],
 };
 
 const SPAWNS = {
@@ -71,6 +80,31 @@ const SPAWNS = {
     // The hollow, south: a wolf and a sporeling keep the door to Mycel's cave.
     { id: 'echo-hollow-1', x: 1330, y: 1620, kind: 'wolf', skin: 'pale' },
     { id: 'echo-hollow-2', x: 1520, y: 1560, kind: 'sporeling', skin: 'violet' },
+  ],
+  // The vault. Nothing native is left alive here — what walks the causeways now
+  // is whoever came to pick a drowned kingdom over, and stayed too long.
+  sunken: [
+    // The western sand and the dead village: bandits camped in the ruins.
+    { id: 'sunken-village-1', x: 560, y: 700, kind: 'bandit', skin: 'leather' },
+    { id: 'sunken-village-2', x: 420, y: 960, kind: 'rogue', skin: 'hooded' },
+    { id: 'sunken-village-3', x: 690, y: 820, kind: 'bandit', skin: 'ironjaw' },
+    { id: 'sunken-sand-1', x: 380, y: 1180, kind: 'rogue', skin: 'knifehand' },
+    { id: 'sunken-sand-2', x: 700, y: 1020, kind: 'bandit', skin: 'leather' },
+    // The southern arm, between the gate and the throne.
+    { id: 'sunken-south-1', x: 1500, y: 2180, kind: 'rogue', skin: 'hooded' },
+    { id: 'sunken-south-2', x: 1440, y: 1960, kind: 'bandit', skin: 'leather' },
+    { id: 'sunken-south-3', x: 1500, y: 1760, kind: 'corsair', skin: 'bosun' },
+    // The northern arm, below the burned stair.
+    { id: 'sunken-north-1', x: 1500, y: 860, kind: 'rogue', skin: 'knifehand' },
+    { id: 'sunken-north-2', x: 1520, y: 620, kind: 'bandit', skin: 'ironjaw' },
+    // The eastern arm, out under the falls — the captain's stretch.
+    { id: 'sunken-east-1', x: 2140, y: 1080, kind: 'rogue', skin: 'hooded' },
+    { id: 'sunken-east-2', x: 2350, y: 1330, kind: 'corsair', skin: 'captain' },
+    { id: 'sunken-east-3', x: 2366, y: 1660, kind: 'bandit', skin: 'ironjaw' },
+    // The shoals, standing out in the shallows.
+    { id: 'sunken-shoal-1', x: 940, y: 1660, kind: 'rogue', skin: 'knifehand' },
+    { id: 'sunken-shoal-2', x: 2020, y: 1560, kind: 'bandit', skin: 'leather' },
+    { id: 'sunken-shoal-3', x: 1500, y: 640, kind: 'corsair', skin: 'bosun' },
   ],
 };
 

@@ -59,7 +59,12 @@ export function updatePlayer(dt) {
     slide(player, ox, oy, 15);
     // Walking off a road at the map's edge crosses into the next region.
     const exit = !game.scripted && exitAt(player.x, player.y);
-    if (exit) crossTo(exit.to, exit.at);
+    if (exit && exit.needs && !progress.bosses[exit.needs]) {
+      // Walked back off the road rather than through it, and told why once.
+      player.x = ox;
+      player.y = oy;
+      if (game.time - lastBarred > 4) { lastBarred = game.time; notify(exit.barred || 'The way is shut.'); }
+    } else if (exit) crossTo(exit.to, exit.at);
   }
 
   recoverEmbers();
@@ -92,6 +97,8 @@ function recoverEmbers() {
 }
 
 /** Steps into another region at a given spot, with its creatures woken. */
+let lastBarred = -9;
+
 export function crossTo(key, at) {
   cancelAttack();
   clearAllEffects();
@@ -104,7 +111,10 @@ export function crossTo(key, at) {
   playMusic(worldTrack(key), 3);
   playAmbience('forest', 3);
   emit('regionChanged', key);
-  notify(key === 'echo' ? 'Echo Grove · the light goes out under the trees.' : 'Hearthwood · the road home.');
+  notify({
+    echo: 'Echo Grove · the light goes out under the trees.',
+    sunken: 'Sunken Vault · buried kingdoms, same roots.',
+  }[key] || 'Hearthwood · the road home.');
 }
 
 /** The last footfall, for checks: which ground it landed on and how many so far. */
@@ -139,7 +149,8 @@ export function heal() {
 }
 
 /** The hearth restores the wanderer and resets the wilds — enemies and resources alike. */
-export function rest() {
+export function rest(site) {
+  world.rememberFire(site);
   cancelAttack();
   clearGore();
   player.hp = maxHp();
@@ -162,7 +173,7 @@ export function rest() {
   if (!progress.fires.includes(game.region)) progress.fires.push(game.region);
   progress.region = game.region;
   save();
-  notify(game.region === 'echo' ? 'Rested in the grove · the fire is remembered' : 'Rested at Hearthwood · the wilds have grown back');
+  notify(game.region === 'sunken' ? `Rested at ${world.fire.name || 'the vault fire'} · this fire is remembered` : game.region === 'echo' ? 'Rested in the grove · the fire is remembered' : 'Rested at Hearthwood · the wilds have grown back');
 }
 
 export function respawn({ silent = false } = {}) {
@@ -176,8 +187,8 @@ export function respawn({ silent = false } = {}) {
   game.near = null;
   game.dead = false;
   if (game.region !== progress.region) enterRegion(progress.region);
-  player.x = world.fire.x - (game.region === 'echo' ? 0 : 29);
-  player.y = world.fire.y + (game.region === 'echo' ? 46 : 66);
+  player.x = world.fire.x - (game.region === 'echo' || game.region === 'sunken' ? 0 : 29);
+  player.y = world.fire.y + (game.region === 'echo' || game.region === 'sunken' ? 46 : 66);
   player.hp = maxHp();
   player.st = maxStamina();
   player.flasks = maxFlasks();

@@ -56,8 +56,11 @@ export function syncHud() {
   $('questText').textContent = questText();
   $('questCount').textContent = `0${progress.quest + 1} / 0${QUEST_STEPS}`;
   const echo = game.region === 'echo';
+  const vault = game.region === 'sunken';
   const place = wild
-    ? (echo ? ['ECHO GROVE', groveDawned() ? 'The canopy is open · the sun gets all the way down' : 'Where no sun reaches'] : ['THE WAKING WILDS', 'Hearthwood Camp · A place to begin'])
+    ? (echo ? ['ECHO GROVE', groveDawned() ? 'The canopy is open · the sun gets all the way down' : 'Where no sun reaches']
+      : vault ? ['SUNKEN VAULT', 'Buried kingdoms · same roots']
+      : ['THE WAKING WILDS', 'Hearthwood Camp · A place to begin'])
     : game.scene === 'room' ? [roomSpec().name, roomSpec().sub]
     : bossSpec().arena === 'cave' ? ['THE DEN BENEATH THE ROOTS', progress.bosses.vaelira ? 'Quiet now · the stone still speaks' : 'Where the grove keeps its warden']
     : ['THE OLD SANCTUARY', progress.won ? 'Beneath the roots · The Herald waits' : 'Beneath the roots · A vow unbroken'];
