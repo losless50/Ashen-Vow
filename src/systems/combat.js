@@ -1,10 +1,10 @@
-import { game, player, progress, save, playing, attackDamage, attackRange, rollInvuln, heavyDiscount, armorDefense, WEAPONS } from '../core/state.js';
-import { ARMOR } from '../core/gear.js';
+import { game, player, progress, save, playing, attackDamage, attackRange, rollInvuln, heavyDiscount, armorDefense, WEAPONS, maxHp, relicSpec } from '../core/state.js';
+import { ARMOR, itemByKey } from '../core/gear.js';
 import { own, equipWeapon } from './inventory.js';
 import { emit } from '../core/events.js';
 import { entities, livingTargets, markSlain, emberReward, bossBodies, isBossBody } from './entities.js';
 import { bossSpec } from './boss.js';
-import { bleed, burst, floatingNumber } from './effects.js';
+import { bleed, burst, floatingNumber, sporeMote, sporeBloom } from './effects.js';
 import { findHarvestTarget, damageHarvestable } from '../world/world.js';
 import { notify } from '../ui/hud.js';
 import { tone, sample, playMusic, worldTrack } from './audio.js';
@@ -92,7 +92,9 @@ export const setDropRoll = fn => { dropRoll = fn; };
 /** The Warden's Edge is a rare drop — taken up on the spot, unreinforced, like any new blade. */
 function bossDrop() {
   const index = WEAPONS.findIndex(w => w.drop?.from === 'warden');
-  if (index < 0 || progress.weapon >= index) return null;
+  // Compared by damage, not by position: the array is ordered by save index now,
+  // not by power, so holding a later blade does not mean holding a better one.
+  if (index < 0 || (WEAPONS[progress.weapon]?.damage || 0) >= WEAPONS[index].damage) return null;
   if (dropRoll() >= WEAPONS[index].drop.chance) return null;
   own(WEAPONS[index].key);
   equipWeapon(WEAPONS[index].key);
@@ -128,8 +130,10 @@ function killReward(target) {
   } else {
     markSlain(target);
     if (target.elite && game.scene === 'room' && !entities.enemies.some(e => e !== target && e.elite && e.hp > 0)) playMusic(worldTrack(game.region), 5);
-    // Some of the Fallen leave something worth taking off the body.
-    const drop = target.elite?.drops && !progress.owned.includes(target.elite.drops) ? ARMOR.find(a => a.key === target.elite.drops) : null;
+    // Some of the Fallen leave something worth taking off the body. It can be
+    // anything ownable now, not only something to wear.
+    const drop = target.elite?.drops && !progress.owned.includes(target.elite.drops)
+      ? itemByKey(target.elite.drops) : null;
     if (drop) own(drop.key);
     save();
     notify(drop ? `${target.elite.name} falls · +${embers} embers, +${ore} ironstone · ${drop.name} taken`
@@ -227,6 +231,8 @@ export function resolveStrike() {
     floatingNumber(target.x, target.y - 35, '' + damage, '#fff1c2');
     game.shake = special ? 4 : 2;
     sample('impact', special ? .8 : .65, special ? .9 : 1);
+    const venomOnBlade = bladeRot();
+    if (venomOnBlade && target.hp > 0) rot(target, venomOnBlade.time, venomOnBlade.damage);
     if (isBossBody(target) && target.hp > 0) bossSpec().onHurt?.(target);
     // A boss that fights in rounds gets back up instead of falling.
     if (!target.hp && !(isBossBody(target) && bossSpec().onLethal?.(target))) killReward(target);
@@ -284,8 +290,68 @@ function updateVenom(dt) {
   if (player.poison <= 0) { clearVenom(); notify('The venom passes.'); }
 }
 
+/**
+ * The Mycelian Fang leaves the grove's rot in whatever it cuts. It is the same
+ * shape as the venom he can catch — a tick a second, for a few seconds — and it
+ * deepens every time Rowan takes the hammer to the blade.
+ */
+export function rot(target, seconds, damage) {
+  target.rotLeft = Math.max(target.rotLeft || 0, seconds);
+  target.rotDamage = Math.max(target.rotDamage || 0, damage);
+  target.rotTick ??= 1;
+}
+
+/** What the blade puts in a wound at its current reinforcement, or nothing. */
+export function bladeRot() {
+  const v = WEAPONS[progress.weapon]?.venom;
+  return v ? { time: v.time, damage: v.damage + (v.perLevel || 0) * progress.blade } : null;
+}
+
+function updateRot(dt) {
+  for (const t of [...entities.enemies, ...bossBodies()]) {
+    if (!t.rotLeft || t.hp <= 0) continue;
+    t.rotLeft -= dt;
+    t.rotTick -= dt;
+    if (t.rotTick <= 0) {
+      t.rotTick = 1;
+      t.hp = Math.max(0, t.hp - t.rotDamage);
+      floatingNumber(t.x, t.y - 40, '−' + t.rotDamage, '#a8e04a');
+      burst(t.x, t.y - 18, '#6fd6b0', 4);
+      // Rot can finish something the blade did not, and that still counts.
+      if (!t.hp && !(isBossBody(t) && bossSpec().onLethal?.(t))) killReward(t);
+    }
+    if (t.rotLeft <= 0) { t.rotLeft = 0; t.rotDamage = 0; }
+  }
+}
+
+/**
+ * The Sporemother's Heart: it closes wounds on its own, a little at a time, and
+ * it stops well short of whole. Above its ceiling it does nothing at all, so it
+ * carries him between fights rather than through one.
+ */
+function updateRelicRegen(dt) {
+  const spec = relicSpec();
+  if (!spec?.regen || game.dead || !playing()) { player.mendTimer = 0; return; }
+  const ceiling = maxHp() * spec.regen.cap;
+  if (player.hp >= ceiling) { player.mendTimer = 0; player.mending = 0; return; }
+  player.mendTimer = (player.mendTimer || 0) + dt;
+  // Spores gather for the last second before it takes, then go into him.
+  player.mending = Math.max(0, Math.min(1, (player.mendTimer - (spec.regen.every - 1)) / 1));
+  if (player.mending > 0 && Math.random() < player.mending * dt * 40) sporeMote(player.x, player.y);
+  if (player.mendTimer < spec.regen.every) return;
+  player.mendTimer = 0;
+  player.mending = 0;
+  const healed = Math.min(Math.round(maxHp() * spec.regen.share), Math.ceil(ceiling - player.hp));
+  if (healed <= 0) return;
+  player.hp = Math.min(ceiling, player.hp + healed);
+  floatingNumber(player.x, player.y - 44, '+' + healed, '#a8e04a');
+  sporeBloom(player.x, player.y);
+}
+
 export function updateAttack(dt) {
   updateVenom(dt);
+  updateRot(dt);
+  updateRelicRegen(dt);
   player.parryLock = Math.max(0, player.parryLock - dt);
   player.attack = Math.max(0, player.attack - dt);
   if (player.queuedHeavy) {

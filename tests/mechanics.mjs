@@ -7,6 +7,7 @@ const state = await import('../src/core/state.js');
 const { game, player, progress, keys, camera } = state;
 const { update } = await import('../src/core/loop.js');
 const combat = await import('../src/systems/combat.js');
+const gear = await import('../src/core/gear.js');
 const audio = await import('../src/systems/audio.js');
 const { attack, updateAttack, cancelAttack, roll, hurt, attackPose, upgradeToHeavy } = combat;
 const { heal, rest, respawn, updatePlayer, footsteps, crossTo } = await import('../src/systems/player.js');
@@ -1084,12 +1085,18 @@ check('each weapon adds damage and reach', () => {
   progress.buildings.whetstone = false;
   const seen = WEAPONS.map((w, i) => {
     progress.weapon = i;
-    return { damage: state.attackDamage(false), reach: state.attackRange(false) };
+    return { key: w.key, damage: state.attackDamage(false), reach: state.attackRange(false) };
   });
-  for (let i = 1; i < seen.length; i++) {
-    assert.ok(seen[i].damage > seen[i - 1].damage, 'later blades hit harder');
-    assert.ok(seen[i].reach > seen[i - 1].reach, 'later blades reach further');
+  const by = key => seen.find(x => x.key === key);
+  // Array order is the save format — `progress.weapon` is an index into it — so
+  // power is asserted by name, not by position.
+  for (const [weaker, stronger] of [['traveler', 'ironsong'], ['ironsong', 'fang'], ['fang', 'warden']]) {
+    assert.ok(by(stronger).damage > by(weaker).damage, `the ${stronger} hits harder than the ${weaker}`);
+    assert.ok(by(stronger).reach > by(weaker).reach, `the ${stronger} reaches further than the ${weaker}`);
   }
+  // Mycel's blade is a real step up and still not the best thing in the game.
+  assert.ok(by('fang').damage > by('traveler').damage && by('fang').damage < by('warden').damage,
+    'the Fang sits between the Traveler\u2019s Blade and the Warden\u2019s Edge');
   assert.equal(seen[0].damage, 23);
 });
 
@@ -1168,6 +1175,89 @@ check('the Warden’s Edge is never forged — it drops from the Warden 15% of t
   combat.setDropRoll(Math.random);
   Object.assign(progress, saved);
   game.scene = 'wild';
+});
+
+check('Mycel leaves the Fang: a middling blade whose rot deepens with every reinforcement', () => {
+  const saved = structuredClone(progress);
+  const fang = WEAPONS.find(w => w.key === 'fang');
+  assert.ok(fang, 'the blade exists');
+  assert.equal(fang.cost, undefined, 'Rowan cannot make it');
+  assert.ok(!FORGEABLE.includes(fang));
+  assert.equal(rooms.ROOMS.burrow.spawn.elite.drops, 'fang', 'and Mycel is carrying it');
+
+  // The rot on the blade deepens every time it is reinforced.
+  progress.weapon = WEAPONS.indexOf(fang);
+  const ticks = [];
+  for (let level = 0; level <= gear.BLADE_MAX; level++) {
+    progress.blade = level;
+    ticks.push(combat.bladeRot().damage);
+  }
+  for (let i = 1; i < ticks.length; i++) assert.ok(ticks[i] > ticks[i - 1], 'each level bites deeper');
+  assert.ok(ticks[gear.BLADE_MAX] >= ticks[0] * 2, 'and a fully reinforced one is far worse');
+
+  // Other blades leave nothing behind.
+  progress.weapon = 0;
+  assert.equal(combat.bladeRot(), null, 'the Traveler\u2019s Blade only cuts');
+
+  // A cut with it actually puts rot into what it hits, and the rot kills.
+  progress.weapon = WEAPONS.indexOf(fang);
+  progress.blade = 5;
+  const dummy = { kind: 'wildling', id: 'test-rot', x: 0, y: 0, hp: 30, max: 30, state: 'idle' };
+  combat.rot(dummy, 4, 12);
+  assert.equal(dummy.rotLeft, 4);
+  entities.enemies.push(dummy);
+  game.scene = 'wild'; game.dead = false;
+  for (let i = 0; i < 40; i++) updateAttack(.1);
+  assert.ok(dummy.hp < 30, 'it keeps working after the swing');
+  entities.enemies = entities.enemies.filter(e => e !== dummy);
+  Object.assign(progress, saved);
+});
+
+check('the Sporemother leaves her Heart: it mends him slowly, and stops short of whole', () => {
+  const saved = structuredClone(progress);
+  const heart = gear.RELICS.find(r => r.key === 'spore');
+  assert.ok(heart, 'the relic exists');
+  assert.equal(rooms.ROOMS.sporehouse.spawn.elite.drops, 'spore', 'and she is carrying it');
+
+  game.scene = 'wild'; game.dead = false; game.screen = 'play'; game.modal = false;
+  progress.relic = 'spore';
+  const full = state.maxHp(), ceiling = full * heart.regen.cap;
+  player.hp = 10;
+  effects.spores.length = 0;
+  // 5% of the bar every 5s, so climbing out of near-death takes over a minute.
+  for (let i = 0; i < 90 / .05; i++) updateAttack(.05);
+  assert.ok(player.hp > 10, 'it closes wounds on its own');
+  assert.ok(player.hp <= ceiling + 1, `it stops at three quarters (${Math.round(player.hp)} of ${full})`);
+  assert.ok(player.hp >= ceiling - 1, 'and it does get there');
+  assert.ok(effects.spores.length > 0, 'with spores coming in to do it');
+
+  // Above the ceiling it does nothing at all, so it never carries a fight.
+  player.hp = full;
+  const before = player.hp;
+  for (let i = 0; i < 400; i++) updateAttack(.05);
+  assert.equal(player.hp, before, 'it will not top him up past its ceiling');
+
+  // Without the relic there is no mending.
+  progress.relic = null;
+  player.hp = 10;
+  for (let i = 0; i < 400; i++) updateAttack(.05);
+  assert.equal(player.hp, 10, 'and nothing mends without it');
+  Object.assign(progress, saved);
+});
+
+check('Greymane\u2019s Pelt carries the roll further than mail does', () => {
+  const saved = structuredClone(progress);
+  const pelt = gear.ARMOR.find(a => a.key === 'pelt');
+  assert.ok(pelt.roll > 0, 'the hide is worth something to a dodge');
+  progress.armor = 'mail';
+  const plain = state.rollSpeed();
+  progress.armor = 'pelt';
+  const furred = state.rollSpeed();
+  assert.ok(furred > plain, 'the pack covered more ground');
+  // The roll runs a fixed .33s, so speed is distance.
+  assert.ok(furred / plain > 1.2 && furred / plain < 1.5,
+    `a useful step, not a teleport (${(furred / plain).toFixed(2)}x)`);
+  Object.assign(progress, saved);
 });
 
 check('camp buildings apply their effects', () => {

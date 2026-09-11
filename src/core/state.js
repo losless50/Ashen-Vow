@@ -130,6 +130,10 @@ export const maxStamina   = () => 100 + stat('endurance') * 7 + worn('stamina') 
 export const staminaRegen = () => 29 + stat('endurance') * 1.5 + worn('staminaRegen');
 export const moveSpeed    = () => 133 * (1 + stat('agility') * .02);
 export const rollInvuln   = () => .3 + stat('agility') * .012;
+/** How fast a dodge carries him. The roll runs a fixed .33s, so this is its length. */
+export const rollSpeed    = () => 340 + worn('roll');
+/** The relic on him, when it is one that does something by itself. */
+export const relicSpec    = () => RELICS.find(r => r.key === progress.relic) || null;
 export const flaskHeal    = () => 55 + stat('resolve') * 5 + (built('well') ? 12 : 0);
 export const maxFlasks    = () => 3 + (built('shelter') ? 1 : 0) + Math.floor(stat('resolve') / 3) + ware('flask');
 /** Stamina a heavy strike costs after the Herald's blessing. */

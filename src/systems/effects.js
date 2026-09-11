@@ -1,9 +1,9 @@
 import { game } from '../core/state.js';
 import { rect } from '../render/primitives.js';
 
-export const particles = [], numbers = [], bloodStains = [], goreFragments = [];
+export const particles = [], numbers = [], bloodStains = [], goreFragments = [], spores = [];
 
-const LIMITS = { stains: 320, fragments: 60, particles: 450 };
+const LIMITS = { stains: 320, fragments: 60, particles: 450, spores: 90 };
 
 function cap(list, max) {
   if (list.length > max) list.splice(0, list.length - max);
@@ -13,6 +13,28 @@ export function burst(x, y, c, n = 10) {
   for (let i = 0; i < n; i++)
     particles.push({ x, y, vx: (Math.random() - .5) * 90, vy: (Math.random() - .5) * 90, life: .3 + Math.random() * .5, c });
   cap(particles, LIMITS.particles);
+}
+
+/**
+ * The Sporemother's Heart drawing the bog in to close a wound: motes come out
+ * of the air a little way off and drift in, and go out where they touch him.
+ */
+export function sporeMote(x, y, hurry = 1) {
+  const a = Math.random() * Math.PI * 2, r = 52 + Math.random() * 46;
+  spores.push({
+    x: x + Math.cos(a) * r, y: y - 18 + Math.sin(a) * r * .7,
+    tx: x, ty: y - 20,
+    life: .85 / hurry, max: .85 / hurry,
+    size: 1 + Math.random() * 1.6,
+    wobble: Math.random() * 6.28,
+    c: ['#a8e04a', '#6fd6b0', '#d8f0a0'][spores.length % 3],
+  });
+  cap(spores, LIMITS.spores);
+}
+
+/** A handful at once, for the moment the mending actually takes. */
+export function sporeBloom(x, y, n = 18) {
+  for (let i = 0; i < n; i++) sporeMote(x, y, 1.6);
 }
 
 /** Chips of wood or stone thrown away from the point of impact. */
@@ -99,6 +121,16 @@ export function updateEffects(dt) {
       if (list[i].life <= 0) list.splice(i, 1);
     }
   for (const n of numbers) { n.life -= dt; n.y -= 20 * dt; }
+  // Spores home in on him, easing as they arrive, and vanish on contact.
+  for (const sp of spores) {
+    sp.life -= dt;
+    const t = 1 - Math.max(0, sp.life) / sp.max;
+    const ease = t * t;
+    sp.x += (sp.tx - sp.x) * Math.min(1, ease * 4 * dt * 6);
+    sp.y += (sp.ty - sp.y) * Math.min(1, ease * 4 * dt * 6);
+    sp.x += Math.sin(game.time * 6 + sp.wobble) * 14 * dt;
+  }
+  for (let i = spores.length - 1; i >= 0; i--) if (spores[i].life <= 0) spores.splice(i, 1);
   for (let i = particles.length - 1; i >= 0; i--) if (particles[i].life <= 0) particles.splice(i, 1);
   for (let i = numbers.length - 1; i >= 0; i--) if (numbers[i].life <= 0) numbers.splice(i, 1);
 }
@@ -112,4 +144,5 @@ export function clearAllEffects() {
   clearGore();
   particles.length = 0;
   numbers.length = 0;
+  spores.length = 0;
 }

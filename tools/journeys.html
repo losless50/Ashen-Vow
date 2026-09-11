@@ -1,0 +1,92 @@
+<!doctype html>
+<!-- Dev only. The title screen assumes journey 1 whenever the active-journey
+     pointer is missing, so a save in slot 2 or 3 can strand you on "No journey
+     yet". Served from the same origin as the game, this page sees the same
+     localStorage: it shows exactly what the game will read, and can move a
+     journey into the slot the game actually opens.
+     http://localhost:8000/tools/journeys.html -->
+<meta charset="utf-8">
+<title>Ashen Vow · journeys on this origin</title>
+<style>
+  body { margin:0; background:#14110f; color:#d8cba7; font:13px/1.6 monospace; padding:24px; }
+  h1 { font-size:14px; letter-spacing:.25em; color:#e8d9b6; font-weight:normal; margin:0 0 4px; }
+  pre { background:#0e0c0a; border:1px solid #3a3228; padding:12px 14px; color:#b8a88c; white-space:pre-wrap; }
+  .slot { border:1px solid #3a3228; background:#1c1815; padding:12px 14px; margin-bottom:10px; }
+  .slot h2 { margin:0 0 4px; font-size:13px; color:#cf8a56; font-weight:normal; }
+  .slot p { margin:1px 0; color:#b8a88c; }
+  .empty { opacity:.45; }
+  .live { border-color:#cf8a56; }
+  button { font:13px monospace; background:#cf8a56; color:#1c1815; border:0; padding:8px 14px; margin:8px 8px 0 0; cursor:pointer; }
+  button:hover { background:#e5a878; }
+  .warn { color:#e5a878; }
+  a { color:#b4c69b; }
+</style>
+<h1>JOURNEYS ON THIS ORIGIN</h1>
+<pre id="diag">reading…</pre>
+<div id="list"></div>
+<p><a href="/">← back to the game</a></p>
+<script>
+const SAVE = 'ashen-vow-journey-v1', PICK = 'ashen-vow-journey-slot', COUNT = 3;
+const slotKey = i => (i === 0 ? SAVE : `${SAVE}-${i + 1}`);
+// The exact arithmetic the game uses to decide which journey it opens.
+const clamp = i => Math.max(0, Math.min(COUNT - 1, Math.floor(i) || 0));
+const activeSlot = () => clamp(Number(localStorage.getItem(PICK)));
+
+function parse(i) {
+  const raw = localStorage.getItem(slotKey(i));
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return 'broken'; }
+}
+// The game shows "No journey yet" unless one of these is true.
+const started = j => !!j && j !== 'broken' && (j.quest > 0 || j.wood || j.ore || j.embers
+  || j.blade || j.weapon || (j.armor && j.armor !== 'rags'));
+
+function render() {
+  const live = activeSlot();
+  const opens = parse(live);
+  document.getElementById('diag').textContent =
+    `origin            ${location.origin}\n` +
+    `storage works     ${(() => { try { localStorage.setItem('_t','1'); localStorage.removeItem('_t'); return 'yes'; } catch (e) { return 'NO — ' + e.name; } })()}\n` +
+    `pointer value     ${JSON.stringify(localStorage.getItem(PICK))}\n` +
+    `=> game opens     journey ${live + 1}  (key "${slotKey(live)}")\n` +
+    `=> that key holds ${opens ? (opens === 'broken' ? 'unreadable text' : 'a journey') : 'NOTHING'}\n` +
+    `=> title shows    ${started(opens) ? 'CONTINUE' : 'Begin — "No journey yet"'}\n` +
+    `all ashen keys    ${Object.keys(localStorage).filter(k => k.startsWith('ashen')).join(', ') || '(none)'}`;
+
+  const list = document.getElementById('list');
+  list.replaceChildren();
+  for (let i = 0; i < COUNT; i++) {
+    const j = parse(i);
+    const box = document.createElement('div');
+    box.className = `slot${j && j !== 'broken' ? '' : ' empty'}${i === live ? ' live' : ''}`;
+    box.append(Object.assign(document.createElement('h2'), {
+      textContent: `Journey ${i + 1}  ·  ${slotKey(i)}${i === live ? '   ← the game opens this one' : ''}`,
+    }));
+    if (!j || j === 'broken') {
+      box.append(Object.assign(document.createElement('p'), { textContent: j === 'broken' ? 'stored, but unreadable' : 'nothing stored' }));
+    } else {
+      for (const line of [
+        `region ${j.region ?? '—'}   quest ${j.quest ?? 0}   ${j.won ? 'Warden down' : 'Warden standing'}${j.blessed ? '   blessed' : ''}`,
+        `weapon ${j.weapon ?? 0}${j.blade ? ` +${j.blade}` : ''}   armor ${j.armor ?? '—'}   relic ${j.relic ?? '—'}`,
+        `${j.embers ?? 0} embers   ${j.ore ?? 0} ironstone   ${j.wood ?? 0} wood`,
+      ]) box.append(Object.assign(document.createElement('p'), { textContent: line }));
+
+      // Belt and braces: point the game here AND copy it into the slot the game
+      // falls back to, so this works even if the pointer will not stick.
+      const go = document.createElement('button');
+      go.textContent = `Play journey ${i + 1}`;
+      go.onclick = () => {
+        const text = localStorage.getItem(slotKey(i));
+        localStorage.setItem(PICK, String(i));
+        if (i !== 0) localStorage.setItem(SAVE, text);   // journey 1 is what the game opens by default
+        render();
+        if (started(parse(activeSlot()))) location.href = '/';
+        else alert('The write did not stick — storage is being blocked for this site.');
+      };
+      box.append(go);
+    }
+    list.append(box);
+  }
+}
+render();
+</script>

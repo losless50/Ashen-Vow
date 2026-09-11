@@ -1,8 +1,8 @@
 import { W, H, game, player, camera } from '../core/state.js';
-import { particles, numbers } from '../systems/effects.js';
+import { particles, numbers, spores } from '../systems/effects.js';
 import { entities, enemyStats } from '../systems/entities.js';
 import { bossSpec } from '../systems/boss.js';
-import { rect, label } from './primitives.js';
+import { rect, label, ellipse } from './primitives.js';
 import { drawWild, drawBoss } from './scenes.js';
 import { drawRoom } from './rooms.js';
 import * as world from '../world/world.js';
@@ -74,6 +74,17 @@ export function draw() {
     if (p.scene && p.scene !== game.scene) continue;
     ctx.globalAlpha = Math.min(1, p.life * 2);
     rect(ctx, p.x, p.y, 3, 3, p.c);
+  }
+  ctx.globalAlpha = 1;
+  // The Sporemother's Heart pulling the bog in: motes brighten as they close,
+  // then go out against him.
+  for (const sp of spores) {
+    const t = Math.max(0, sp.life) / sp.max;
+    ctx.globalAlpha = Math.min(1, (1 - t) * 1.6) * Math.min(1, t * 4);
+    const r = sp.size * (.5 + t);
+    ellipse(ctx, sp.x, sp.y, r, r, sp.c);
+    ctx.globalAlpha *= .5;
+    ellipse(ctx, sp.x, sp.y, r * 2.2, r * 2.2, sp.c);
   }
   ctx.globalAlpha = 1;
   for (const n of numbers) label(ctx, n.x, n.y, n.text, n.c, 11);

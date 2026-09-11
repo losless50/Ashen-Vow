@@ -1,6 +1,10 @@
 // Craftable gear and camp buildings. Costs escalate steeply so that the quarry
 // and the treeline stay worth farming well past the first blade.
 
+/**
+ * Order here is part of the save format: `progress.weapon` is an index into
+ * this array, so a new blade is appended rather than slotted in by power.
+ */
 export const WEAPONS = [
   {
     key: 'traveler', name: 'Traveler’s Blade',
@@ -26,6 +30,17 @@ export const WEAPONS = [
     palette: { edge: '#d8cdae', shine: '#fff5cf', fuller: '#8a6a3f', grip: '#2c2030', guard: '#f0c877' },
     line: '“That came off the Warden. I have never seen its like, and I will not pretend I could make one.”',
   },
+  {
+    key: 'fang', name: 'Mycelian Fang',
+    damage: 16, reach: 12, length: 42, heavyLength: 60,
+    flavor: 'Bone the grove grew through. The wound it leaves keeps growing.',
+    // Never forged: taken off Mycel. Rowan can still reinforce it, and the rot
+    // in the blade answers to the same hammer — every level deepens the tick.
+    drop: { from: 'mycel' },
+    venom: { time: 4, damage: 4, perLevel: 2 },
+    palette: { edge: '#b8c8a4', shine: '#e9f4d6', fuller: '#4a6340', grip: '#3b2f22', guard: '#8fceb5' },
+    line: '“That is not steel. Whatever the grove put in it is still alive, and it will not come out.”',
+  },
 ];
 
 /**
@@ -36,20 +51,33 @@ export const ARMOR = [
   { key: 'rags', name: 'Road rags', defense: 0, flavor: 'What the banishment left him.' },
   { key: 'mail', name: 'Mended mail', defense: 2, flavor: 'Rowan’s chain and plate, fitted at the forge.' },
   {
-    key: 'pelt', name: 'Greymane’s Pelt', defense: 3, stamina: 15, staminaRegen: 3,
+    key: 'pelt', name: 'Greymane’s Pelt', defense: 3, stamina: 15, staminaRegen: 3, roll: 96,
     flavor: 'The alpha’s hide over Rowan’s mail. It still smells of the boneyard.',
+    blurb: 'You cover the ground the way the pack did',
   },
 ];
 
 /** Relics: one worn at a time. */
 export const RELICS = [
   { key: 'charm', name: 'Hearth charm', blurb: '+20 maximum vitality', flavor: 'Pressed into your palm by Mira.' },
+  {
+    key: 'spore', name: 'The Sporemother’s Heart',
+    blurb: 'Mends you slowly, but only back to three quarters',
+    flavor: 'Still warm, and still opening and closing. The bog grew it to keep something alive; it is not particular about what.',
+    // Mends REGEN_SHARE of the bar every REGEN_EVERY seconds, and stops at
+    // REGEN_CAP — it will carry you between fights, never through one.
+    regen: { share: .05, every: 5, cap: .75 },
+  },
 ];
 
 /** Things carried, not worn: bought once, always working. */
 export const TOOLS = [
   { key: 'lantern', name: 'Pocket lantern', blurb: 'Lights a few steps ahead in the dark', flavor: 'A brass box no bigger than a fist, with a wick that never seems to shorten.', cost: { embers: 300 } },
 ];
+
+/** Anything ownable, by key: weapons, what he wears, relics and tools alike. */
+export const itemByKey = key =>
+  [...WEAPONS, ...ARMOR, ...RELICS, ...TOOLS].find(i => i.key === key) || null;
 
 /** How far Rowan can take a blade. Each level is +8 damage. */
 export const BLADE_MAX = 5;

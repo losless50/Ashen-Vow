@@ -1,6 +1,4 @@
-import {
-  game, player, progress, keys, stick, save, playing, lostHere, ARENA,
-  maxHp, maxStamina, staminaRegen, moveSpeed, flaskHeal, maxFlasks, ware, HERALD_WARES, clearBoons } from '../core/state.js';
+import { game, player, progress, keys, stick, save, playing, lostHere, ARENA, maxHp, maxStamina, staminaRegen, moveSpeed, flaskHeal, maxFlasks, ware, HERALD_WARES, clearBoons, rollSpeed } from '../core/state.js';
 import { cancelAttack, clearVenom } from './combat.js';
 import { entities, spawnEnemies, enemyStats } from './entities.js';
 import { burst, clearGore, clearAllEffects } from './effects.js';
@@ -42,8 +40,8 @@ export function updatePlayer(dt) {
   const ox = player.x, oy = player.y;
   if (player.roll > 0) {
     player.roll -= dt;
-    player.x += player.rx * 340 * dt;
-    player.y += player.ry * 340 * dt;
+    player.x += player.rx * rollSpeed() * dt;
+    player.y += player.ry * rollSpeed() * dt;
     burst(player.x, player.y, '#cee7c3', 1);
   } else if (dx || dy) {
     const d = Math.max(1, Math.hypot(dx, dy));

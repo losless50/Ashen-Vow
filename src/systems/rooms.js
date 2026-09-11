@@ -17,13 +17,13 @@ export const ROOMS = {
     name: 'THE SPOREHOUSE', sub: 'Inside the great mushroom', exitName: 'Climb back down', region: 'echo',
     door: { x: 2680, y: 766 },
     spawn: { id: 'sporemother', x: 750, y: 620, kind: 'sporeling', skin: 'mother', once: true,
-      elite: { name: 'The Sporemother', title: 'What the bog grew from its dead', hp: 1152, damage: 87, scale: 1.75, embers: 240, radius: 24, hitRange: 110, chase: 400 } },
+      elite: { name: 'The Sporemother', title: 'What the bog grew from its dead', hp: 1152, damage: 87, scale: 1.75, embers: 240, radius: 24, hitRange: 110, chase: 400, drops: 'spore' } },
   },
   burrow: {
     name: 'MYCEL’S CAVE', sub: 'Mushroom-light under the hollow', exitName: 'Back to the hollow', region: 'echo',
     door: { x: 1190, y: 1716 },
     spawn: { id: 'mycel', x: 750, y: 575, kind: 'wolf', skin: 'grafted', once: true,
-      elite: { name: 'Mycel, the Grafted', title: 'A wolf the grove grew through', hp: 936, damage: 102, scale: 1.45, embers: 225, radius: 16, spore: true, chase: 400 } },
+      elite: { name: 'Mycel, the Grafted', title: 'A wolf the grove grew through', hp: 936, damage: 102, scale: 1.45, embers: 225, radius: 16, spore: true, chase: 400, drops: 'fang' } },
   },
 };
 
