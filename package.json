@@ -1,0 +1,25 @@
+{
+  "name": "ashen-vow",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "description": "An original top-down pixel action RPG prototype. No build step, no dependencies.",
+  "scripts": {
+    "test": "node tests/mechanics.mjs && node tests/resume.mjs",
+    "start": "python3 -m http.server 8000 --bind 0.0.0.0",
+    "build": "node tools/build.mjs",
+    "android": "npm run build && npx cap sync android && npx cap run android",
+    "android:open": "npm run build && npx cap sync android && npx cap open android",
+    "apk": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "desktop": "npm run build && npx tauri dev",
+    "desktop:build": "npm run build && npx tauri build"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/core": "^8.5.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.1",
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

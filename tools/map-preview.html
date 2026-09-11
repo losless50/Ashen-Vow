@@ -1,0 +1,14 @@
+<!doctype html>
+<!-- Dev only: paints the travel map at 2x so it can be eyeballed without playing to the hearth.
+     Open via the dev server: http://127.0.0.1:8000/tools/map-preview.html -->
+<meta charset="utf-8">
+<style>body{margin:0;background:#0d0b14}canvas{image-rendering:pixelated;width:1040px;height:920px;display:block}</style>
+<canvas id="m" width="520" height="460"></canvas>
+<script type="module">
+  import { drawWorldMap } from '../src/render/worldmap.js';
+  const found = new URLSearchParams(location.search).get('found')?.split(',') || ['hearthwood'];
+  const c = document.getElementById('m').getContext('2d');
+  const t0 = performance.now();
+  const tick = () => { drawWorldMap(c, { found, here: 'hearthwood', selected: 'echo', time: (performance.now() - t0) / 1000 + 3 }); requestAnimationFrame(tick); };
+  tick();
+</script>

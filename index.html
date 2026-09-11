@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1">
+  <meta name="theme-color" content="#100d16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Ashen Vow</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23100d16'/%3E%3Cpath d='M16 4 18.6 13.4 28 16l-9.4 2.6L16 28l-2.6-9.4L4 16l9.4-2.6z' fill='%23d4b877'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- The world canvas sits under every screen; the title uses it as a live backdrop. -->
+  <canvas id="game" tabindex="0" aria-label="Ashen Vow game world"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+
+  <!-- ── Title ─────────────────────────────────────────────────────────── -->
+  <section class="screen title-screen" id="titleScreen">
+    <div class="title-scrim" aria-hidden="true"></div>
+    <div class="title-body">
+      <div class="title-mark" aria-hidden="true">✧</div>
+      <h1 class="title-name">ASHEN VOW</h1>
+      <p class="title-sub">IN ASH, WE REMEMBER · IN VOW, WE RISE</p>
+      <nav class="title-menu" id="titleMenu"></nav>
+      <p class="title-save" id="titleSave">No journey yet</p>
+    </div>
+    <div class="title-version">EARLY WORLD · v0.6</div>
+  </section>
+
+  <!-- ── Intro · the banishment ────────────────────────────────────────── -->
+  <section class="screen intro-screen" id="introScreen" hidden>
+    <div class="intro-card">
+      <canvas class="intro-scene" id="introCanvas" width="360" height="150" aria-hidden="true"></canvas>
+      <span class="panel-tag" id="introTag">ELDORIA · BEFORE THE ASH</span>
+      <p class="intro-text" id="introText"></p>
+      <small class="intro-hint" id="introHint">Tap or press any key</small>
+    </div>
+    <button class="slab intro-skip" id="introSkip">Skip</button>
+  </section>
+
+  <!-- ── Play ──────────────────────────────────────────────────────────── -->
+  <section class="screen play-screen" id="playScreen" hidden>
+
+    <div class="hud hud-vitals">
+      <button class="portrait-frame" id="character" aria-label="Inventory and stats"><canvas id="portraitCanvas" width="64" height="64" aria-hidden="true"></canvas></button>
+      <div class="vitals">
+        <div class="vitals-name">ALDREN<span id="level">LV. 1</span></div>
+        <div class="gauge gauge-health"><i id="healthBar"></i><span id="healthText">100 / 100</span></div>
+        <div class="gauge gauge-stamina"><i id="staminaBar"></i></div>
+      </div>
+    </div>
+
+    <div class="hud hud-top-right">
+      <button class="icon-button" id="pause" aria-label="Pause"></button>
+      <button class="icon-button" id="sound" aria-label="Toggle sound" aria-pressed="false"></button>
+      <button class="icon-button" id="help" aria-label="Controls"></button>
+    </div>
+
+    <div class="hud hud-location" id="locationCard">
+      <span id="locationName">THE WAKING WILDS</span>
+      <small id="locationSub">Hearthwood Camp · A place to begin</small>
+    </div>
+
+    <div class="hud hud-quest" id="questCard">
+      <div class="quest-head"><span>YOUR NEXT CHAPTER</span><b id="questCount">01 / 04</b></div>
+      <strong id="questTitle">A spark of belonging</strong>
+      <p id="questText">Speak to Mira beside the campfire.</p>
+    </div>
+
+    <div class="hud hud-world-label" id="worldLabel">HEARTHWOOD CAMP<span>A small fire. A fresh beginning.</span></div>
+
+    <div class="hud hud-boss" id="bossHud" hidden>
+      <span class="boss-name" id="bossName">THE HOLLOW WARDEN</span>
+      <div class="boss-gauge"><i id="bossBar"></i></div>
+      <small id="bossTell">Guardian of the old sanctuary</small>
+    </div>
+
+    <div class="hud hud-toast" id="toast" role="status"></div>
+    <div class="caption" id="caption" role="status" hidden></div>
+
+    <button class="prompt" id="interact" hidden><kbd>E</kbd><span>Talk</span></button>
+
+    <div class="hud hud-actions">
+      <div class="weapon-chip"><span id="weaponName">TRAVELER’S BLADE</span><small id="weaponLevel">Weathered, but willing.</small></div>
+    </div>
+
+    <div class="hud hud-flask">
+      <button class="action-button" id="heal" aria-label="Drink flask"><b id="flasks">3</b><kbd>F</kbd></button>
+      <button class="action-button parry-button" id="parry" aria-label="Parry" hidden><kbd>E</kbd></button>
+    </div>
+
+    <div class="hud hud-pouch">
+      <span class="pouch-stat" id="woodStat"><b id="wood">0</b></span>
+      <span class="pouch-stat" id="oreStat"><b id="ore">0</b></span>
+      <span class="pouch-stat" id="emberStat"><b id="embers">0</b></span>
+    </div>
+
+    <div class="touch-layer" id="touchLayer">
+      <div class="stick" id="joystick"><span></span></div>
+    </div>
+  </section>
+
+  <!-- ── The world map ─────────────────────────────────────────────────── -->
+  <section class="screen map-screen" id="mapScreen" hidden>
+    <canvas id="mapCanvas" aria-label="World map"></canvas>
+    <div class="map-tools">
+      <button class="icon-button map-tool" id="mapZoomIn" aria-label="Zoom in">+</button>
+      <button class="icon-button map-tool" id="mapZoomOut" aria-label="Zoom out">−</button>
+      <button class="icon-button map-tool" id="mapClose" aria-label="Close map">×</button>
+    </div>
+    <div class="map-bar">
+      <span id="mapStatus">Tap a campfire.</span>
+      <button class="slab" id="mapGo" disabled>Travel</button>
+    </div>
+  </section>
+
+  <!-- ── Panels ────────────────────────────────────────────────────────── -->
+  <div class="overlay" id="overlay" hidden>
+    <div class="panel" id="dialogPanel" role="dialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogBody">
+      <div class="panel-portrait" id="conversationPortrait" hidden>
+        <canvas id="npcPortrait" width="96" height="120" aria-hidden="true"></canvas>
+        <span id="portraitCaption"></span>
+      </div>
+      <button class="panel-close" id="conversationClose" aria-label="Close" hidden></button>
+      <div class="panel-body">
+        <div class="speaker" id="speakerLine" hidden><span id="speakerName"></span><i></i></div>
+        <span class="panel-tag" id="dialogTag"></span>
+        <h2 id="dialogTitle"></h2>
+        <p id="dialogBody"></p>
+        <div id="dialogExtra"></div>
+        <div class="panel-actions" id="dialogActions"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fader" id="fader" aria-hidden="true"></div>
+</div>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

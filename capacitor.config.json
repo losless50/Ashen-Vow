@@ -1,0 +1,17 @@
+{
+  "appId": "com.ashenvow.game",
+  "appName": "Ashen Vow",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#100d16",
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#100d16",
+      "showSpinner": false
+    }
+  }
+}
