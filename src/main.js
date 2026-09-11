@@ -140,7 +140,19 @@ if (devFlags.has('grove')) goToScreen('play', { instant: true }).then(() => {
     setTimeout(groveDawn, 400);
   }
   // `&den` opens the roots and drops straight into Vaelira's fight; `&den=2` or `=3` at that round.
-  if (devFlags.has('den')) { enterBoss('vaelira'); const r = Number(devFlags.get('den')) || 1; for (let i = 1; i < r; i++) nextStage(entities.boss); if (r > 1) { entities.boss.state = 'stalk'; entities.boss.hp = entities.boss.max; entities.boss.timer = .5; } }
+  // `?throne` drops straight into the hold under the Drowned Throne; `?throne=2`
+// skips the captain and starts on the thing the two of them become.
+if (devFlags.has('throne')) goToScreen('play', { instant: true }).then(async () => {
+  progress.bosses.vaelira = true;
+  enterBoss('tandem');
+  if (devFlags.get('throne') === '2') {
+    const b = entities.boss;
+    b.hp = 0;
+    b.pair.molt.hp = b.pair.molt.max;
+    (await import('./systems/tandem.js')).tandemLethal(b);
+  }
+});
+if (devFlags.has('den')) { enterBoss('vaelira'); const r = Number(devFlags.get('den')) || 1; for (let i = 1; i < r; i++) nextStage(entities.boss); if (r > 1) { entities.boss.state = 'stalk'; entities.boss.hp = entities.boss.max; entities.boss.timer = .5; } }
 });
 
 // Read-only diagnostics for automated smoke checks and balancing.
@@ -150,7 +162,8 @@ window.__ashen = {
     player: { ...player },
     progress: structuredClone(progress),
     level: characterLevel(), maxHp: maxHp(),
-    boss: entities.boss ? { ...entities.boss } : null,
+    // `pair` and `bodies` point back at the boss; a snapshot has to stay acyclic.
+    boss: entities.boss ? (({ pair, bodies, ...rest }) => ({ ...rest, stage: pair?.stage })) (entities.boss) : null,
     near: game.near?.type,
     enemies: entities.enemies.map(e => ({ ...e })),
     world: {

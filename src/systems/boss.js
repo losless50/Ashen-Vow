@@ -4,6 +4,7 @@ import { hurt, cancelAttack } from './combat.js';
 import { burst } from './effects.js';
 import { dismissHerald, restHerald } from './herald.js';
 import { makeVaelira, updateVaelira, tickVaelira, nextStage, vaeliraHurt, clearVaelira, vaeliraDefeated, STAGES } from './vaelira.js';
+import { makeTandem, updateTandem, tandemLethal, tandemHurt, clearTandem, tandemDefeated, tandemName } from './tandem.js';
 import { notify } from '../ui/hud.js';
 import { emit } from '../core/events.js';
 import { tone, playMusic, playAmbience, sample, worldTrack, bossTrack } from './audio.js';
@@ -60,6 +61,47 @@ export const BOSSES = {
       idle: 'What the grove made of its warden',
     },
   },
+  tandem: {
+    name: 'THE TWO ON THE THRONE', embers: 900,
+    arena: 'vault', region: 'sunken', exit: { x: 1500, y: 1500 },
+    rise: 'Two things are down here. One of them stands up. “Off my chair.”',
+    // Two bodies at once, then one made out of both of them.
+    stages: true,
+    make: makeTandem,
+    update: updateTandem,
+    onLethal: tandemLethal,
+    onHurt: tandemHurt,
+    onLeave: clearTandem,
+    onDeath: tandemDefeated,
+    // The captain has his own mouth on him; no beast's roar over it.
+    roar: false,
+    /** The bar names the body the fight is currently about. */
+    barName: tandemName,
+    tells: {
+      slashWind: 'The cutlass is already moving — three cuts, not one',
+      slash: 'Cuts coming — get out of his reach, not behind him',
+      cleaveWind: 'He winds the cutlass right back — roll through the lane',
+      cleave: 'He comes down the line',
+      bonesWind: 'He is throwing his crew at you — a fan, wide',
+      blunderbussWind: 'The blunderbuss comes level — anywhere but in front',
+      cannonWind: 'The gun in its chest is loaded — the marked ground goes up',
+      pincerWind: 'Both claws open — get beside it, not in front',
+      pincer: 'The claws come round',
+      stingWind: 'The tail is up — the marked ground takes venom with it',
+      sting: 'The tail comes down',
+      sprayWind: 'It rears to spit — the floor it lands on stays poisoned',
+      burrowWind: 'It has gone under the marked ground — move off it',
+      skitterWind: 'It sets itself to run past',
+      chargeWind: 'It plants six legs — the lane is marked',
+      charge: 'It comes down the lane',
+      sweepWind: 'The claws go wide — roll through the ring',
+      molt: 'The shell is splitting — it comes out faster every time',
+      absorb: 'It is taking him into itself. Nothing you do now matters',
+      fallen: 'The captain is down',
+      recover: 'It is open — strike now',
+      idle: 'Two on one chair, and both of them swinging',
+    },
+  },
 };
 
 export const bossSpec = () => BOSSES[entities.boss?.kind || 'warden'];
@@ -83,7 +125,11 @@ export function enterBoss(kind = 'warden') {
     tone(520, .5, 'sine');
     return;
   }
-  entities.boss = spec.make ? { ...spec.make(), kind } : { kind, x: 750, y: 585, hp: spec.hp, max: spec.hp, state: 'stalk', timer: 1.5, phase: 1, hit: false, dx: 0, dy: 0, combo: 0 };
+  // Assigned onto the made object rather than spread into a copy: a boss with
+  // more than one body points at itself, and a shallow copy severs that.
+  entities.boss = spec.make
+    ? Object.assign(spec.make(), { kind })
+    : { kind, x: 750, y: 585, hp: spec.hp, max: spec.hp, state: 'stalk', timer: 1.5, phase: 1, hit: false, dx: 0, dy: 0, combo: 0 };
   playMusic(bossTrack(spec.region), 1.5);
   if (kind === 'warden' && progress.quest === 3) progress.quest = 4;
   save();

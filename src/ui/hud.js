@@ -76,11 +76,19 @@ export function syncHud() {
   $('bossHud').hidden = wild || room ? !elite : !boss || boss.hp <= 0;
   if (!wild && !room && boss) {
     const spec = bossSpec();
-    $('bossName').textContent = spec.name;
+    $('bossName').textContent = spec.barName?.(boss) || spec.name;
     $('bossBar').style.width = boss.hp / boss.max * 100 + '%';
     $('bossTell').textContent = spec.tells[boss.state] || (boss.phase === 2 ? spec.tells.phase2 : spec.tells.idle);
+    // A fight with a second body standing gets a second bar under the first.
+    const mate = (boss.bodies || []).find(t => t !== boss && t.hp > 0);
+    $('bossName2').hidden = $('bossGauge2').hidden = !mate;
+    if (mate) {
+      $('bossName2').textContent = spec.barName?.(mate) || mate.name || '';
+      $('bossBar2').style.width = mate.hp / mate.max * 100 + '%';
+    }
   } else if (elite) {
     // The Fallen get the same bar as a main boss while they are close.
+    $('bossName2').hidden = $('bossGauge2').hidden = true;
     $('bossName').textContent = elite.elite.name.toUpperCase();
     $('bossBar').style.width = elite.hp / elite.max * 100 + '%';
     $('bossTell').textContent =

@@ -1,5 +1,5 @@
 import { game, camera } from '../core/state.js';
-import { entities } from '../systems/entities.js';
+import { entities, bossBodies } from '../systems/entities.js';
 import { veins, props, npcs, fire as regionFire } from '../world/world.js';
 import { player, progress, lostHere } from '../core/state.js';
 import { bossSpec } from '../systems/boss.js';
@@ -214,6 +214,26 @@ export function atmosphere(c) {
     if (progress.owned.includes('lantern')) light(c, player.x, player.y - 16, LANTERN_R * flicker, .38, lanternGlow);
     if (lost) light(c, lost.x, lost.y - 8, 96 * flicker, 1);
     for (const e of entities.enemies) if (e.hp > 0) light(c, e.x, e.y - 30, 50, .6, e.kind === 'sporeling' ? violetGlow : tealGlow);
+  } else if (game.scene === 'boss' && bossSpec().arena === 'vault') {
+    // The hold is lit by what is floating in the water and by the lamp in his skull.
+    darkness(c, .5, '#03090c');
+    c.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 14; i++) {
+      const a = i / 14 * Math.PI * 2;
+      light(c, 750 + Math.cos(a) * 198, 553 + Math.sin(a) * 176 - 10, 42, .7, i % 3 ? tealGlow : blueGlow);
+    }
+    light(c, 750, 300, 74, .5, amberGlow);
+    light(c, player.x, player.y - 20, 58, .28, holyGlow);
+    if (progress.owned.includes('lantern')) light(c, player.x, player.y - 16, LANTERN_R * flicker, .38, lanternGlow);
+    if (lost) light(c, lost.x, lost.y - 8, 96 * flicker, 1);
+    for (const body of bossBodies()) {
+      if (body.hp <= 0 || body.state === 'fallen') continue;
+      // The captain's one lit eye, and whatever the sting is full of.
+      if (body.role === 'captain') light(c, body.x, body.y - 70, 46 * flicker, .7, tealGlow);
+      else light(c, body.x, body.y - 26, body.state === 'molt' ? 120 : 74, .6, body.state === 'molt' ? holyGlow : tealGlow);
+      if (body.role === 'crowned') light(c, body.x, body.y - 82, 58 * flicker, .7, amberGlow);
+    }
+    for (const s of entities.shots) light(c, s.x, s.y, 20, .6, amberGlow);
   } else if (game.scene === 'boss' && bossSpec().arena === 'cave') {
     darkness(c, .45, '#04080a');
     c.globalCompositeOperation = 'screen';

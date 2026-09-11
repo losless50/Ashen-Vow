@@ -9,8 +9,8 @@ const { update } = await import('../src/core/loop.js');
 const combat = await import('../src/systems/combat.js');
 const { attack, updateAttack, cancelAttack, roll, hurt, attackPose, upgradeToHeavy } = combat;
 const { heal, rest, respawn, updatePlayer, footsteps, crossTo } = await import('../src/systems/player.js');
-const { entities, spawnEnemies, ENEMY_KINDS, SKIN_KEYS, emberReward, livingTargets } = await import('../src/systems/entities.js');
-const { enterBoss, updateBoss } = await import('../src/systems/boss.js');
+const { entities, spawnEnemies, ENEMY_KINDS, SKIN_KEYS, emberReward, livingTargets, isBossBody } = await import('../src/systems/entities.js');
+const { enterBoss, updateBoss, bossSpec } = await import('../src/systems/boss.js');
 const effects = await import('../src/systems/effects.js');
 const { bloodStains, goreFragments, particles, bleed } = effects;
 const world = await import('../src/world/world.js');
@@ -35,6 +35,7 @@ const scenes = await import('../src/render/scenes.js');
 const sunken = await import('../src/world/sunken.js');
 const { boons } = await import('../src/core/state.js');
 const vaelira = await import('../src/systems/vaelira.js');
+const tandem = await import('../src/systems/tandem.js');
 const { WHIP: whip } = await import('../src/systems/vaelira-patterns.js');
 const { drawWorldMap, regionAt, MAP_W, MAP_H } = await import('../src/render/worldmap.js');
 const travelUi = await import('../src/ui/travel.js');
@@ -2350,6 +2351,138 @@ check('the causeway holds: he cannot walk off the stone into the water', () => {
   world.enterRegion('hearthwood');
   Object.assign(progress, saved);
   spawnEnemies('hearthwood');
+});
+
+check('the two on the throne: the beast will not stay dead while the captain stands', () => {
+  const saved = structuredClone(progress);
+  progress.bosses = {};
+  enterBoss('tandem');
+  const b = entities.boss, pair = b.pair;
+  game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+  assert.equal(b.role, 'captain', 'the captain leads the fight');
+  assert.equal(entities.boss, pair.captain, 'and is the boss object itself, not a copy of it');
+  // Both bodies can be hit; both count as the boss for parries and rewards.
+  assert.deepEqual(livingTargets().map(t => t.role), ['captain', 'molt'], 'both are targets');
+  assert.ok(isBossBody(pair.molt), 'the beast takes the boss rules too');
+
+  // Cutting the beast down does nothing but cost it a shell.
+  for (let i = 1; i <= 3; i++) {
+    pair.molt.hp = 0;
+    assert.equal(bossSpec().onLethal(pair.molt), true, 'lethal damage on the beast is refused');
+    assert.equal(pair.molt.hp, pair.molt.max, 'it comes back at full health');
+    assert.equal(pair.molt.molts, i, 'and counts the shell it left');
+    assert.equal(pair.molt.state, 'molt');
+    assert.ok(pair.molt.untargetable, 'it cannot be hit again while it is splitting');
+    for (let k = 0; k < 90; k++) updateBoss(.035);
+    assert.notEqual(pair.molt.state, 'molt', 'then it is out of the shell');
+    assert.equal(pair.molt.untargetable, false, 'and can be fought again');
+  }
+  assert.ok(pair.captain.hp > 0, 'none of which touched the captain');
+  assert.equal(pair.stage, 1, 'and the fight has not moved on');
+  Object.assign(progress, saved);
+});
+
+check('the two on the throne: killing the captain merges them into one boss', () => {
+  const saved = structuredClone(progress);
+  progress.bosses = {};
+  enterBoss('tandem');
+  const pair = entities.boss.pair;
+  game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+
+  pair.captain.hp = 0;
+  assert.equal(bossSpec().onLethal(pair.captain), true, 'his death does not end the fight');
+  assert.equal(pair.stage, 'absorbing', 'the beast goes for what is left of him');
+  assert.equal(entities.boss, pair.molt, 'and the bar follows the body still fighting');
+  assert.equal(entities.boss.role, 'crowned');
+  assert.equal(entities.boss.hp, tandem.CROWNED_HP, 'on a fresh pool of health');
+  assert.deepEqual(livingTargets(), [], 'nothing to hit while it is taking him up');
+
+  for (let i = 0; i < 200 && pair.stage !== 2; i++) updateBoss(.035);
+  assert.equal(pair.stage, 2, 'it finishes and stands up');
+  assert.deepEqual(livingTargets().map(t => t.role), ['crowned'], 'one body now, and it can be hit');
+  assert.equal(entities.boss.bodies.length, 1, 'the captain is no longer his own target');
+
+  // The merged form fights on its own rotation, and this time it can die.
+  const states = new Set();
+  for (let i = 0; i < 1200; i++) { updateBoss(.035); states.add(entities.boss.state); }
+  for (const move of ['chargeWind', 'stingWind', 'cannonWind', 'sweepWind', 'slashWind', 'bonesWind'])
+    assert.ok(states.has(move), `the thing they became uses ${move}`);
+  entities.boss.hp = 0;
+  assert.equal(bossSpec().onLethal(entities.boss), false, 'and nothing catches it the third time');
+  Object.assign(progress, saved);
+});
+
+check('the two on the throne: both of them swing at once, and both use their own moves', () => {
+  const saved = structuredClone(progress);
+  progress.bosses = {};
+  enterBoss('tandem');
+  const pair = entities.boss.pair;
+  game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+  const committed = t => t.state !== 'stalk' && t.state !== 'recover' && t.state !== 'molt';
+  let both = 0;
+  const seen = { captain: new Set(), molt: new Set() };
+  for (let i = 0; i < 6000; i++) {
+    updateBoss(.035);
+    if (committed(pair.captain) && committed(pair.molt)) both++;
+    for (const body of [pair.captain, pair.molt]) seen[body.role].add(body.state);
+  }
+  assert.ok(both > 200, 'the pressure is two things arriving at once, not one at a time');
+  // His hands: fast chained cuts, the committed lunge, bone and shot.
+  for (const move of ['slashWind', 'cleaveWind', 'bonesWind', 'blunderbussWind'])
+    assert.ok(seen.captain.has(move), `the captain uses ${move}`);
+  // Hers: claws, the poisoned tail, venom on the floor, and going under it.
+  for (const move of ['stingWind', 'pincerWind', 'sprayWind', 'burrowWind'])
+    assert.ok(seen.molt.has(move), `the beast uses ${move}`);
+  // Both stay inside the arena the whole time.
+  for (const body of [pair.captain, pair.molt]) {
+    assert.ok(body.x >= state.ARENA.minX && body.x <= state.ARENA.maxX, `${body.role} stays in the room`);
+    assert.ok(body.y >= state.ARENA.minY && body.y <= state.ARENA.maxY, `${body.role} stays in the room`);
+  }
+  Object.assign(progress, saved);
+});
+
+check('the two on the throne: the tail poisons hard and briefly, and the floor it spits on keeps', () => {
+  const saved = structuredClone(progress);
+  progress.bosses = {};
+  enterBoss('tandem');
+  const pair = entities.boss.pair;
+  game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+  player.hp = state.maxHp();
+  combat.clearVenom();
+
+  // Stand where the tail is committed to land and take it.
+  const molt = pair.molt;
+  molt.markX = player.x; molt.markY = player.y;
+  molt.move = 'sting'; molt.state = 'sting'; molt.timer = .3; molt.hit = false;
+  player.inv = 0;
+  updateBoss(.035);
+  assert.ok(player.poison > 0, 'the sting leaves venom in the wound');
+  assert.ok(player.poison <= 3.01, 'a few seconds of it, not the rest of the fight');
+  assert.ok(player.venomDamage >= 18, 'and it is heavy while it lasts');
+  const ticks = Math.ceil(player.poison);
+  assert.ok(ticks <= 3, `only ${ticks} ticks`);
+
+  // A spit leaves venom standing on the floor, and standing in it re-poisons.
+  combat.clearVenom();
+  pair.pools = [];
+  molt.move = 'spray'; molt.state = 'sprayWind'; molt.timer = -1; molt.windDuration = .4;
+  updateBoss(.035);
+  assert.ok(pair.pools.length >= 3, 'the spray covers ground, not a point');
+  pair.pools = [{ x: player.x, y: player.y, r: 50, life: 5, max: 7 }];
+  player.inv = 0;
+  updateBoss(.035);
+  assert.ok(player.poison > 0, 'and standing in it takes hold');
+  combat.clearVenom();
+  Object.assign(progress, saved);
+});
+
+check('the stair under the Drowned Throne is stood on ground he can reach', () => {
+  world.enterRegion('sunken');
+  const stair = world.npcs.find(n => n.type === 'throne');
+  assert.ok(stair, 'the throne is something to press E on');
+  assert.equal(world.blocked(stair.x, stair.y + 60, 15), false, 'with standing room in front of it');
+  assert.equal(world.blocked(1500, 1500, 15), false, 'and the way back up lands on the court');
+  world.enterRegion('hearthwood');
 });
 
 check('the character sheet figure renders without disturbing the player', () => {

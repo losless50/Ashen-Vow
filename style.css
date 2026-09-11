@@ -317,6 +317,10 @@ button:focus-visible, #game:focus-visible {
   overflow: hidden;
 }
 .boss-gauge i { display: block; height: 100%; background: linear-gradient(#cf8a56, #8d4b2c); transition: width .18s; }
+/* A second body in the same fight: same bar, quieter, so the first still leads. */
+.boss-name-2 { display: block; margin-top: 7px; font-size: 9px; color: #bda98d; }
+.boss-gauge-2 { height: 7px; margin-top: 4px; }
+.boss-gauge-2 i { background: linear-gradient(#8fae7c, #4d6a45); }
 .hud-boss small { display: block; margin-top: 6px; font-size: 9.5px; font-style: italic; color: #cbb191; text-shadow: 0 1px 3px #000; }
 
 .hud-toast {

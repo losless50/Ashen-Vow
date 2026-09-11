@@ -32,7 +32,7 @@ export function autoScale(height) {
 let wideView = false;
 const wantsWideView = () =>
   entities.enemies.some(e => e.hp > 0 && enemyStats(e).scale >= 3)
-  || (entities.boss?.hp > 0 && bossSpec().arena === 'cave');
+  || (entities.boss?.hp > 0 && (bossSpec().arena === 'cave' || bossSpec().arena === 'vault'));
 
 export function resize() {
   const r = canvas.getBoundingClientRect();

@@ -163,10 +163,22 @@ export function markSlain(e) {
 /** A creature's numbers: its kind, with any elite overrides on top. */
 export const enemyStats = e => (e.elite ? { ...ENEMY_KINDS[e.kind], ...e.elite } : ENEMY_KINDS[e.kind]);
 
+/**
+ * The bodies a boss fight is made of. Most bosses are one thing; a tandem boss
+ * carries the list of everything currently standing on the boss itself.
+ */
+export const bossBodies = () => {
+  const b = entities.boss;
+  return b ? (b.bodies || [b]) : [];
+};
+
+/** Whether a swing landing on this is a swing landing on the boss. */
+export const isBossBody = t => bossBodies().includes(t);
+
 /** Everything a player swing is allowed to damage in the current scene. */
 export function livingTargets() {
   return game.scene === 'boss'
-    ? (entities.boss?.hp > 0 ? [entities.boss] : [])
+    ? bossBodies().filter(t => t.hp > 0 && !t.untargetable)
     : entities.enemies.filter(e => e.hp > 0 && !e.hidden);
 }
 

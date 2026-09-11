@@ -2,7 +2,7 @@ import { game, player, progress, save, playing, attackDamage, attackRange, rollI
 import { ARMOR } from '../core/gear.js';
 import { own, equipWeapon } from './inventory.js';
 import { emit } from '../core/events.js';
-import { entities, livingTargets, markSlain, emberReward } from './entities.js';
+import { entities, livingTargets, markSlain, emberReward, bossBodies, isBossBody } from './entities.js';
 import { bossSpec } from './boss.js';
 import { bleed, burst, floatingNumber } from './effects.js';
 import { findHarvestTarget, damageHarvestable } from '../world/world.js';
@@ -103,7 +103,7 @@ function bossDrop() {
 const oreDrop = () => 3 + Math.floor(dropRoll() * 4);
 
 function killReward(target) {
-  const boss = target === entities.boss;
+  const boss = isBossBody(target);
   const embers = boss ? bossSpec().embers : emberReward(target);
   progress.embers += embers;
   const ore = boss || target.elite ? oreDrop() : 0;
@@ -149,9 +149,10 @@ const PARRY_WINDOW = .13, PARRY_REACH = 100, EXPOSED_FOR = 1.7, WHIFF_LOCK = .8;
 /** Whatever is winding up a blow at him right now, in reach — window or not. */
 function incoming() {
   if (game.scene === 'boss') {
-    const b = entities.boss;
-    // Any boss winding up a blow can be caught, whatever it is called.
-    if (b && b.hp > 0 && b.state.endsWith('Wind') && Math.hypot(b.x - player.x, b.y - player.y) < PARRY_REACH + 40) return b;
+    // Any boss body winding up a blow can be caught, whatever it is called.
+    for (const b of bossBodies())
+      if (b.hp > 0 && !b.untargetable && b.state.endsWith('Wind')
+          && Math.hypot(b.x - player.x, b.y - player.y) < PARRY_REACH + 40) return b;
     return null;
   }
   for (const e of entities.enemies) {
@@ -197,7 +198,7 @@ export function parry() {
   player.inv = Math.max(player.inv, .3);
   player.st = Math.max(0, player.st - 8);
   player.face = Math.atan2(t.y - player.y, t.x - player.x);
-  if (t === entities.boss) { t.state = 'recover'; t.timer = EXPOSED_FOR; t.hit = true; t.hits = 0; }
+  if (isBossBody(t)) { t.state = 'recover'; t.timer = EXPOSED_FOR; t.hit = true; t.hits = 0; }
   else { t.state = 'exposed'; t.timer = EXPOSED_FOR; t.chain = 0; }
   burst(player.x + Math.cos(player.face) * 20, player.y - 22, '#fff2c4', 16);
   game.shake = 3;
@@ -208,7 +209,7 @@ export function parry() {
 }
 
 /** An exposed creature or a recovering boss takes half again as much. */
-const exposed = t => t.state === 'exposed' || (t === entities.boss && t.state === 'recover');
+const exposed = t => t.state === 'exposed' || (isBossBody(t) && t.state === 'recover');
 
 /** Runs on the exact contact frame of a committed swing. */
 export function resolveStrike() {
@@ -226,9 +227,9 @@ export function resolveStrike() {
     floatingNumber(target.x, target.y - 35, '' + damage, '#fff1c2');
     game.shake = special ? 4 : 2;
     sample('impact', special ? .8 : .65, special ? .9 : 1);
-    if (target === entities.boss && target.hp > 0) bossSpec().onHurt?.(target);
+    if (isBossBody(target) && target.hp > 0) bossSpec().onHurt?.(target);
     // A boss that fights in rounds gets back up instead of falling.
-    if (!target.hp && !(target === entities.boss && bossSpec().onLethal?.(target))) killReward(target);
+    if (!target.hp && !(isBossBody(target) && bossSpec().onLethal?.(target))) killReward(target);
   } else if (game.scene === 'wild') {
     // A whiff still bites into whatever timber or ironstone stands in the arc.
     const harvest = findHarvestTarget(player.x, player.y, player.attackFace, attackRange(special), spec.cone);

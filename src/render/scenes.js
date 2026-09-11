@@ -10,7 +10,9 @@ import { ECHO_VAULT_GATE, ECHO_VAULT_JAMBS, ECHO_VAULT_TORCHES, ECHO_VAULT_WALLS
 import { SUNKEN, SUNKEN_FIRES, SUNKEN_TORCHES } from '../world/sunken.js';
 import { drawBlood } from '../systems/effects.js';
 import { rect, ellipse, poly, path, label } from './primitives.js';
-import { human, drawCreature, drawWarden, drawVaelira, drawArrow, drawCritter, drawHerald } from './actors.js';
+import { human, drawCreature, drawWarden, drawVaelira, drawArrow, drawCritter, drawHerald,
+  drawDrownedCaptain, drawMolt, drawHusk } from './actors.js';
+import { GROUND_SCALE } from '../systems/vaelira-patterns.js';
 import { crystal, lantern, lamps, wildCrystals, sanctuaryCrystals } from './lighting.js';
 
 // --- flora --------------------------------------------------------------------
@@ -1213,8 +1215,82 @@ function drawCave(c) {
   label(c, 750, 873, '↧ THE GROVE', '#bfe8c4', 10);
 }
 
+/**
+ * The hold under the Drowned Throne: a flooded stone chamber with a ship in it,
+ * wedged where the water left it. Ankle-deep the whole way across, which is why
+ * everything down here has been standing in salt for a very long time.
+ */
+function drawVault(c) {
+  const t = game.time;
+  rect(c, 0, 0, W, H, '#070d10');
+  // Block walls, then the standing water over the floor of the chamber.
+  for (let y = 230; y < 910; y += 28)
+    for (let x = 435; x < 1075; x += 42)
+      rect(c, x + (y % 56 ? 21 : 0), y, 40, 26, (x + y) % 3 ? '#101a1e' : '#16232a');
+  ellipse(c, 750, 553, 212, 191, '#0c1a20');
+  ellipse(c, 750, 553, 200, 180, '#122c33');
+  ellipse(c, 750, 553, 188, 168, '#15343d');
+  // Light off the water, moving, so the floor is never quite still.
+  for (let i = 0; i < 26; i++) {
+    const a = i / 26 * Math.PI * 2 + Math.sin(t * .4 + i) * .3;
+    const r = 40 + ((i * 53) % 140);
+    const x = 750 + Math.cos(a) * r, y = 553 + Math.sin(a) * r * .84;
+    c.globalAlpha = .1 + Math.abs(Math.sin(t * .9 + i)) * .16;
+    ellipse(c, x, y, 22 + (i % 4) * 9, 4 + (i % 3) * 2, '#7fd4dd');
+    c.globalAlpha = 1;
+  }
+  // Columns down both sides, broken off at different heights.
+  for (const side of [470, 1030])
+    for (let i = 0; i < 5; i++) {
+      const y = 300 + i * 132, h = 90 + (i % 3) * 44;
+      rect(c, side - 19, y - h, 38, h, '#0d1518');
+      rect(c, side - 14, y - h + 5, 27, h - 8, '#2c3c3a');
+      for (let k = y - h + 18; k < y; k += 22) path(c, [[side - 13, k], [side + 12, k]], 2, '#1b2826');
+      rect(c, side - 24, y - h - 8, 48, 10, '#55604b');
+      path(c, [[side + 9, y - h + 12], [side + 4, y - 30], [side + 11, y - 6]], 3, '#3f604b');
+    }
+  // The wreck, bow-on, driven into the back wall of the hold.
+  const bx = 750, by = 318;
+  poly(c, [[bx - 132, by + 62], [bx - 96, by - 26], [bx, by - 58], [bx + 96, by - 26], [bx + 132, by + 62]], '#100e12');
+  poly(c, [[bx - 120, by + 58], [bx - 86, by - 18], [bx, by - 48], [bx + 86, by - 18], [bx + 120, by + 58]], '#3a2e26');
+  for (let i = 0; i < 7; i++) path(c, [[bx - 116 + i * 4, by + 54 - i * 2], [bx + 116 - i * 4, by + 54 - i * 2]], 3, i % 2 ? '#2a2118' : '#4c3d2c');
+  // Ribs where the planking has gone, and the mast snapped off over the chamber.
+  for (let i = -3; i <= 3; i++) path(c, [[bx + i * 26, by - 40], [bx + i * 30, by + 56]], 4, '#231c16');
+  path(c, [[bx - 6, by - 44], [bx + 16, by - 150], [bx + 30, by - 196]], 11, '#2a2118');
+  path(c, [[bx - 6, by - 46], [bx + 15, by - 150], [bx + 28, by - 194]], 6, '#4c3d2c');
+  for (let i = 0; i < 5; i++) path(c, [[bx + 4 + i * 6, by - 90 - i * 22], [bx + 40 + i * 9, by - 70 - i * 20]], 2, '#5e6a58');
+  // The throne itself, two seats, on the deck of the thing that brought it here.
+  for (const side of [-1, 1]) {
+    const sx = bx + side * 44;
+    poly(c, [[sx - 22, by + 24], [sx - 18, by - 30], [sx + 18, by - 30], [sx + 22, by + 24]], '#1a2420');
+    poly(c, [[sx - 17, by + 20], [sx - 14, by - 25], [sx + 14, by - 25], [sx + 17, by + 20]], '#45564a');
+    rect(c, sx - 20, by - 34, 40, 8, '#7e8a6a');
+    for (let i = 0; i < 4; i++) rect(c, sx - 14 + i * 8, by - 42 + (i % 2) * 4, 4, 9, '#c9a94e');
+  }
+  // Chain, anchor and the cages the crew came down in.
+  for (const [cx2, cy2] of [[560, 700], [940, 690], [620, 840]]) {
+    ellipse(c, cx2, cy2 + 6, 26, 9, '#08121466');
+    for (let i = 0; i < 5; i++) rect(c, cx2 - 18 + i * 9, cy2 - 34, 3, 38, '#2b3730');
+    rect(c, cx2 - 20, cy2 - 38, 40, 6, '#38463c');
+    rect(c, cx2 - 20, cy2 - 2, 40, 5, '#38463c');
+    rect(c, cx2 - 6, cy2 - 20, 9, 16, '#cdd0bb');
+  }
+  for (let i = 0; i < 9; i++) ellipse(c, 432 + i * 13, 604 + Math.sin(i) * 8, 9, 5, '#2b3730');
+  // The way back up, at the foot of the chamber.
+  rect(c, 712, 827, 76, 26, '#1b2a2c');
+  label(c, 750, 873, '\u21a7 THE VAULT', '#9fd6dd', 10);
+}
+
+function drawVaultScene(c) {
+  drawVault(c);
+  drawBlood(c);
+  drawLostEmbers(c);
+  drawArenaActors(c);
+}
+
 export function drawBoss(c) {
   if (bossSpec().arena === 'cave') { drawCaveScene(c); return; }
+  if (bossSpec().arena === 'vault') { drawVaultScene(c); return; }
   rect(c, 0, 0, W, H, '#18161f');
   for (let y = 240; y < 900; y += 32)
     for (let x = 445; x < 1065; x += 40) {
@@ -1259,9 +1335,111 @@ export function drawBoss(c) {
   drawArenaActors(c);
 }
 
+/** What the tandem pair is about to do, marked on the floor before it happens. */
+function tandemTells(c, b) {
+  const wind = b.windDuration || 1, done = Math.min(1, 1 - Math.max(0, b.timer) / wind);
+  const a = Math.atan2(b.dy, b.dx);
+  if (b.state === 'slashWind') {
+    // Barely a warning, on purpose: a short bright arc where the cut will fall.
+    c.save();
+    c.translate(b.x, b.y);
+    c.scale(1, GROUND_SCALE);
+    c.beginPath();
+    c.arc(0, 0, 92, a - 1, a + 1);
+    c.strokeStyle = '#ffe9a8';
+    c.lineWidth = 3 + done * 3;
+    c.globalAlpha = .35 + done * .5;
+    c.stroke();
+    c.globalAlpha = 1;
+    c.restore();
+  } else if (b.state === 'burrowWind' || b.state === 'cannonWind') {
+    // Where it will come up, or where the shell is aimed to land.
+    const r = b.state === 'burrowWind' ? 62 : 56;
+    const hot = b.state === 'burrowWind' ? '#9fd64a' : '#ffb765';
+    ellipse(c, b.markX, b.markY, r, r * GROUND_SCALE, hot + '2e');
+    c.strokeStyle = hot;
+    c.lineWidth = 2;
+    c.beginPath();
+    c.ellipse(b.markX, b.markY, r * done, r * GROUND_SCALE * done, 0, 0, 7);
+    c.stroke();
+  } else if (b.state === 'sprayWind') {
+    // The spread it is about to cover, five gobbets wide.
+    c.save();
+    c.translate(b.x, b.y);
+    c.scale(1, GROUND_SCALE);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.arc(0, 0, 190, a - .55, a + .55);
+    c.closePath();
+    c.fillStyle = '#9fd64a2e';
+    c.fill();
+    c.restore();
+  } else if (b.state === 'blunderbussWind') {
+    c.save();
+    c.translate(b.x, b.y);
+    c.scale(1, GROUND_SCALE);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.arc(0, 0, 200, a - .5, a + .5);
+    c.closePath();
+    c.fillStyle = '#ffcf7a33';
+    c.fill();
+    c.strokeStyle = '#ffcf7a';
+    c.lineWidth = 2 + done * 2;
+    c.stroke();
+    c.restore();
+  } else if (b.state === 'cleaveWind' || b.state === 'chargeWind' || b.state === 'skitterWind') {
+    // The lane, drawn on the ground, filling as the windup runs out.
+    const reach = b.state === 'charge' || b.state === 'chargeWind' ? 250 : 190;
+    const wide = b.state === 'chargeWind' ? 54 : 40;
+    c.save();
+    c.translate(b.x, b.y);
+    c.scale(1, GROUND_SCALE);
+    c.rotate(a);
+    poly(c, [[0, -wide], [reach, -wide], [reach, wide], [0, wide]], '#d0916333');
+    c.strokeStyle = '#e5b777';
+    c.lineWidth = 3;
+    c.strokeRect(0, -wide, reach * done, wide * 2);
+    c.restore();
+  } else if (b.state === 'stingWind') {
+    // Where the tail is going, not where it is standing.
+    ellipse(c, b.markX, b.markY, 56, 56 * GROUND_SCALE, '#8fceb533');
+    c.strokeStyle = '#b6e8c8';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.ellipse(b.markX, b.markY, 56 * done, 56 * GROUND_SCALE * done, 0, 0, 7);
+    c.stroke();
+  } else if (b.state === 'pincerWind' || b.state === 'sweepWind') {
+    const reach = b.state === 'sweepWind' ? 128 : 118;
+    c.save();
+    c.translate(b.x, b.y);
+    c.scale(1, GROUND_SCALE);
+    c.beginPath();
+    c.moveTo(0, 0);
+    c.arc(0, 0, reach, a - 1.1, a + 1.1);
+    c.closePath();
+    c.fillStyle = '#d0916333';
+    c.fill();
+    c.strokeStyle = '#e5b777';
+    c.lineWidth = 3;
+    c.beginPath();
+    c.arc(0, 0, reach * done, a - 1.1, a + 1.1);
+    c.stroke();
+    c.restore();
+  } else if (b.state === 'bonesWind') {
+    for (let i = 0; i < 6; i++) {
+      const ang = a + (i - 2.5) * .19;
+      c.globalAlpha = .2 + done * .4;
+      path(c, [[b.x, b.y - 34], [b.x + Math.cos(ang) * 460, b.y - 34 + Math.sin(ang) * 460 * GROUND_SCALE]], 2, '#e4e0c4');
+      c.globalAlpha = 1;
+    }
+  }
+}
+
 /** The boss, its remains, the Herald and the rings — shared by every arena. */
 function drawArenaActors(c) {
   const b = entities.boss;
+  if (b?.kind === 'tandem') { drawTandem(c, b); drawHeraldAndRings(c); return; }
   if (b && b.hp > 0) {
     if (b.state === 'slashWind') {
       c.save();
@@ -1289,6 +1467,54 @@ function drawArenaActors(c) {
     path(c, [[b.x - 20, b.y - 6], [b.x - 13, b.y - 13], [b.x, b.y - 16], [b.x + 13, b.y - 13], [b.x + 20, b.y - 6]], 3, '#b9c2ab');
     for (let i = 0; i <= 5; i++) rect(c, b.x - 18 + i * 7, b.y - 8 - Math.sin(Math.PI * i / 5) * 6, 3, 3, '#c9a94e');
   }
+  drawHeraldAndRings(c);
+}
+
+/**
+ * Both of them, the shells the beast has left, and whatever is on the floor in
+ * front of each. Sorted by depth, so whichever is nearer is drawn over.
+ */
+function drawTandem(c, b) {
+  const pair = b.pair;
+  if (!pair) return;
+  // Venom it has put on the floor, thinning as it soaks away.
+  for (const p of pair.pools) {
+    const fade = Math.min(1, p.life / p.max);
+    c.globalAlpha = .28 + fade * .38;
+    ellipse(c, p.x, p.y, p.r, p.r * GROUND_SCALE, '#2f5a14');
+    ellipse(c, p.x, p.y, p.r * .82, p.r * GROUND_SCALE * .82, '#6d9c2a');
+    c.globalAlpha = .2 + fade * .3;
+    for (let i = 0; i < 5; i++) {
+      const t = game.time * .7 + i * 1.7;
+      ellipse(c, p.x + Math.sin(t) * p.r * .4, p.y + Math.cos(t * .8) * p.r * .3 * GROUND_SCALE,
+        5 + (i % 3) * 3, 3 + (i % 2) * 2, '#c2f05a');
+    }
+    c.globalAlpha = 1;
+  }
+  for (const h of pair.molt.husks) drawHusk(c, h);
+  if (pair.stage === 'absorbing' || pair.captain.state === 'fallen') {
+    // What is left of him, until the beast comes and picks it up.
+    const f = pair.fallen;
+    if (f && !pair.lifted) {
+      ellipse(c, f.x, f.y + 4, 30, 11, '#0a0e1499');
+      poly(c, [[f.x - 26, f.y - 2], [f.x - 18, f.y - 14], [f.x + 14, f.y - 16], [f.x + 26, f.y - 1], [f.x + 8, f.y + 6], [f.x - 16, f.y + 5]], '#332c33');
+      ellipse(c, f.x + 16, f.y - 12, 8, 9, '#cdd0bb');
+      rect(c, f.x + 18, f.y - 14, 3, 3, '#6fd6b0');
+      path(c, [[f.x - 22, f.y - 6], [f.x - 40, f.y - 12]], 3, '#9aa7a0');
+    }
+  }
+  const bodies = [pair.captain, pair.molt]
+    .filter(t => t.hp > 0 && t.state !== 'fallen')
+    .sort((p, q) => p.y - q.y);
+  for (const t of bodies) {
+    tandemTells(c, t);
+    if (t.role === 'captain') drawDrownedCaptain(c, t);
+    else drawMolt(c, t, t.role === 'crowned' && pair.stage === 2);
+  }
+}
+
+/** The Herald, the shots in the air and the expanding rings, for every arena. */
+function drawHeraldAndRings(c) {
   if (entities.herald) {
     drawHerald(c, entities.herald);
     if (game.near?.type === 'herald') bubble(c, entities.herald.x, entities.herald.y - 74, '…');
@@ -1297,14 +1523,18 @@ function drawArenaActors(c) {
   for (const a of entities.shots) drawArrow(c, a);
 
   for (const w of entities.wave) {
+    c.save();
+    c.translate(w.x, w.y);
+    c.scale(1, w.damage ? GROUND_SCALE : 1);
     c.strokeStyle = '#e7b17a';
     c.lineWidth = 8;
     c.beginPath();
-    c.arc(w.x, w.y, w.r, 0, Math.PI * 2);
+    c.arc(0, 0, w.r, 0, Math.PI * 2);
     c.stroke();
     c.strokeStyle = '#f9d89e';
     c.lineWidth = 2;
     c.stroke();
+    c.restore();
   }
   human(c, player.x, player.y);
 }

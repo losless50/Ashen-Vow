@@ -36,6 +36,7 @@ const HANDLERS = {
   exit: () => { leaveBoss(); notify('The warmth of home is waiting.'); },
   gate: sanctuaryGate,
   cave: caveMouth,
+  throne: thronesStair,
   chest: openChest,
   ladder: () => { enterRoom('sporehouse'); },
   burrow: () => { enterRoom('burrow'); },
@@ -51,6 +52,28 @@ const HANDLERS = {
 export function interact() {
   if (!playing() || !game.near) return;
   HANDLERS[game.near.type]?.(game.near);
+}
+
+/** The stair down through the deck of the wreck, under the two empty seats. */
+function thronesStair() {
+  if (progress.bosses.tandem) {
+    showDialog({
+      tag: 'THE DROWNED THRONE',
+      title: 'Two empty chairs.',
+      body: 'The water has gone flat over the hold. Whatever was sitting here is not sitting here now.',
+      actions: [{ label: 'Go down anyway', run: () => { enterBoss('tandem'); closeDialog(); } }, { label: 'Leave it', run: closeDialog }],
+    });
+    return;
+  }
+  showDialog({
+    tag: 'THE DROWNED THRONE',
+    title: 'Two chairs, and both of them taken.',
+    body: 'A stair goes down through the deck into the hold, and the hold is full of standing water. Something big turns over down there, and something else — something with a voice — tells it to be still.\n\nRecommended: full flasks. You may leave up the stair at any time.',
+    actions: [
+      { label: 'Go down', run: () => { enterBoss('tandem'); closeDialog(); } },
+      { label: 'Not yet', run: closeDialog },
+    ],
+  });
 }
 
 function sanctuaryGate() {

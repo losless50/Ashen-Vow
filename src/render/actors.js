@@ -1479,6 +1479,36 @@ export function drawWarden(c, b) {
 
 /** An arrow in the air, and the thin bright line it leaves behind it. */
 export function drawArrow(c, a) {
+  if (a.kind === 'bone' || a.kind === 'scrap') {
+    // What is left of his crew, and what is left of his ship, thrown by hand.
+    const spin = game.time * (a.kind === 'bone' ? 15 : 26) + a.x;
+    c.save();
+    c.translate(Math.round(a.x), Math.round(a.y));
+    c.rotate(spin);
+    if (a.kind === 'bone') {
+      rect(c, -8, -1, 16, 3, '#8d907e');
+      rect(c, -8, -1, 16, 1, '#cdd0bb');
+      for (const e of [-9, 6]) { ellipse(c, e + 1, -2, 3, 2, '#cdd0bb'); ellipse(c, e + 1, 2, 3, 2, '#cdd0bb'); }
+    } else {
+      poly(c, [[-5, -3], [4, -4], [5, 3], [-4, 4]], '#2b3330');
+      poly(c, [[-3, -2], [3, -3], [3, 1], [-2, 2]], '#8d9488');
+    }
+    c.restore();
+    return;
+  }
+  if (a.kind === 'shell') {
+    // A cannon ball, trailing its own smoke, with the fuse still going.
+    for (let i = 1; i < 5; i++) {
+      c.globalAlpha = .26 - i * .045;
+      ellipse(c, a.x - a.vx * i * .016, a.y - a.vy * i * .016, 8 - i, 6 - i * .8, '#6a6258');
+    }
+    c.globalAlpha = 1;
+    ellipse(c, a.x, a.y + 1, 9, 8, '#100e12');
+    ellipse(c, a.x, a.y, 8, 7, '#2e2b29');
+    ellipse(c, a.x - 2, a.y - 2, 3, 2, '#5d5751');
+    ellipse(c, a.x + Math.sin(game.time * 30) * 2, a.y - 8, 3, 3, '#ffcf7a');
+    return;
+  }
   if (a.kind === 'acid') {
     // A gobbet of acid, wobbling as it goes, with a green trail.
     const wob = Math.sin(game.time * 30 + a.x) * 1.5;
@@ -1942,4 +1972,277 @@ export function drawWandererFigure(c, w, h) {
   drawWanderer(c, 0, 0);
   c.restore();
   Object.assign(player, saved);
+}
+
+// --- the two on the Drowned Throne ------------------------------------------------
+
+/** Chitin, and the blue-green rot that has been standing in salt water. */
+const CHITIN = { dark: '#22302b', shell: '#4c6350', lit: '#7e9a72', edge: '#98b585', joint: '#1a241f' };
+
+/**
+ * Vosk. A captain who drowned in his own hold and came up again, mostly bone
+ * under a coat that has not dried since. Drawn on his feet in stage one, and
+ * again slumped over the scorpion's back once it has taken him up.
+ */
+export function drawDrownedCaptain(c, b, mounted = false) {
+  const wind = b.state === 'cleaveWind' || b.state === 'shotWind' || b.state === 'broadsideWind';
+  const raise = wind ? Math.min(1, 1 - Math.max(0, b.timer) / (b.windDuration || 1)) : 0;
+  const sway = b.state === 'stalk' ? Math.sin(game.time * 2.6) * 2 : 0;
+  const step = b.state === 'stalk' ? Math.sin(game.time * 5.4) * 4 : 0;
+  const bone = '#cdd0bb', boneDark = '#8d907e';
+  const coat = '#3b2f3a', coatLit = '#5d4a54', gold = '#c9a94e';
+
+  if (!mounted) ellipse(c, b.x + 2, b.y + 5, 26, 9, '#0a0e1499');
+  c.save();
+  c.translate(Math.round(b.x), Math.round(b.y));
+  const mirror = b.dx < 0 ? -1 : 1;
+  c.scale(mirror, 1);
+
+  if (!mounted) {
+    // One leg is bone to the knee; the boot on the other never came off.
+    for (const [side, lift] of [[-1, step], [1, -step]]) {
+      const x = side * 6;
+      path(c, [[x, -34], [x + lift * .4, -18], [x + lift * .3, -3]], 6, '#171319');
+      path(c, [[x, -34], [x + lift * .4, -18], [x + lift * .3, -4]], 3, side < 0 ? bone : '#2e2620');
+      if (side > 0) { rect(c, x + lift * .3 - 5, -8, 10, 8, '#241d18'); rect(c, x + lift * .3 - 5, -8, 10, 2, '#6b5340'); }
+      else for (let i = 0; i < 3; i++) path(c, [[x - 3, -26 + i * 7], [x + 3, -25 + i * 7]], 1, boneDark);
+    }
+  }
+
+  // A long coat, split and hanging, with the ribs showing where it does not meet.
+  const hip = mounted ? -12 : -34;
+  poly(c, [[-13, -62], [13, -61], [16, -40], [14, hip + 2], [6, hip - 4], [0, hip + 4], [-7, hip - 3], [-15, hip + 1], [-16, -42]], '#171319');
+  poly(c, [[-11, -60], [11, -59], [13, -41], [12, hip], [5, hip - 6], [0, hip + 1], [-6, hip - 5], [-13, hip - 1], [-14, -42]], coat);
+  path(c, [[-7, -58], [-5, -46], [-8, hip - 2]], 2, coatLit);
+  for (let i = 0; i < 4; i++) path(c, [[-5, -56 + i * 5], [5, -55 + i * 5]], 1, i % 2 ? bone : boneDark);
+  // Sash, buckle and the brine still running out of the hem.
+  rect(c, -13, -44, 26, 4, '#6b2330');
+  rect(c, -2, -45, 6, 6, gold);
+  for (let i = 0; i < 4; i++) path(c, [[-10 + i * 7, hip + 1], [-11 + i * 7 + sway * .3, hip + 9]], 1, '#2b4a4a');
+
+  // The skull under the hat: jaw hanging, one lamp of a light where an eye was.
+  ellipse(c, 1, -70, 9, 10, '#171319');
+  ellipse(c, 1, -70, 7, 8, bone);
+  rect(c, -3, -71, 3, 3, '#0b1014');
+  rect(c, 3, -71, 3, 3, '#6fd6b0');
+  for (let i = 0; i < 4; i++) rect(c, -4 + i * 3, -64, 2, 3, boneDark);
+  // Tricorn, sodden, with weed caught in the brim.
+  poly(c, [[-15, -76], [-4, -86], [8, -86], [17, -76], [10, -73], [-8, -73]], '#1d1a20');
+  poly(c, [[-12, -77], [-3, -84], [7, -84], [13, -77], [7, -75], [-7, -75]], '#332c33');
+  path(c, [[-13, -76], [16, -76]], 2, gold);
+  path(c, [[-10, -78], [-6, -70], [-12, -64]], 2, '#3f604b');
+
+  // The cutlass arm comes up through the windup; the pistol comes level instead.
+  const shooting = b.state === 'shotWind' || b.state === 'broadsideWind';
+  path(c, [[-11, -58], [-16 + sway * .4, -48], [-14, -38]], 5, '#171319');
+  path(c, [[-11, -57], [-15 + sway * .4, -48], [-13, -39]], 3, bone);
+  if (shooting) {
+    const hx = 24 + raise * 8, hy = -50;
+    path(c, [[11, -57], [18, -53], [hx, hy]], 5, '#171319');
+    path(c, [[11, -56], [17, -53], [hx - 1, hy]], 3, bone);
+    // A heavy flintlock, and the match already glowing at the pan.
+    rect(c, hx - 2, hy - 4, 16, 6, '#2a2320');
+    rect(c, hx - 2, hy - 3, 14, 2, '#6b5340');
+    rect(c, hx + 12, hy - 3, 6, 3, '#8f9488');
+    if (raise > .6) ellipse(c, hx + 19, hy - 2, 3 + raise * 2, 3, '#ffcf7a');
+  } else {
+    const hx = 18 + raise * 10, hy = -46 - raise * 30;
+    path(c, [[11, -57], [17, -51 - raise * 10], [hx, hy]], 5, '#171319');
+    path(c, [[11, -56], [16, -51 - raise * 10], [hx - 1, hy]], 3, bone);
+    // The cutlass: a wide, pitted curve with the sea still on it.
+    c.save();
+    c.translate(hx, hy);
+    c.rotate(-.9 - raise * 1.5);
+    poly(c, [[0, -3], [46, -13], [58, -4], [46, 4], [0, 4]], '#171319');
+    poly(c, [[2, -2], [44, -11], [54, -4], [44, 2], [2, 2]], '#9aa7a0');
+    path(c, [[4, -1], [44, -8]], 1, '#dfe7e0');
+    rect(c, -6, -6, 8, 12, '#3a2f26');
+    rect(c, -4, -5, 4, 10, gold);
+    c.restore();
+  }
+  c.restore();
+}
+
+/** The husk it left behind: the same shell, empty, split up the back. */
+export function drawHusk(c, h) {
+  ellipse(c, h.x, h.y + 4, 42, 15, '#0a0e1466');
+  c.save();
+  c.translate(Math.round(h.x), Math.round(h.y));
+  c.scale(1, GROUND_SCALE);
+  c.rotate(h.angle);
+  for (const side of [-1, 1]) for (let i = 0; i < 3; i++)
+    path(c, [[-8 + i * 12, side * 10], [-14 + i * 14, side * 30], [-20 + i * 16, side * 40]], 3, '#3c4a3d');
+  poly(c, [[-34, -26], [26, -30], [44, 0], [26, 30], [-34, 26], [-44, 0]], '#3a473c');
+  poly(c, [[-30, -21], [22, -24], [36, 0], [22, 24], [-30, 21], [-38, 0]], '#59685180');
+  // The split it came out of, straight up the back.
+  poly(c, [[-26, -7], [30, -4], [30, 4], [-26, 7]], '#10171400');
+  path(c, [[-28, 0], [32, 0]], 7, '#11181499');
+  c.restore();
+}
+
+/**
+ * The Molt. A scorpion the size of a longboat, drawn flat on the ground plane
+ * the way a scorpion actually stands, with the tail arcing up out of that plane
+ * in screen space so it still reads as being over its own back.
+ */
+export function drawMolt(c, b, rider = false) {
+  const a = Math.atan2(b.dy, b.dx);
+  const scale = rider ? 1.18 : 1;
+  const gait = b.state === 'stalk' || b.state === 'absorb' ? Math.sin(game.time * 7) : 0;
+  const open = b.state === 'pincerWind' || b.state === 'sweepWind'
+    ? Math.min(1, 1 - Math.max(0, b.timer) / (b.windDuration || 1)) : 0;
+  const molting = b.state === 'molt';
+  const pale = molting ? Math.max(0, b.timer) / 2.3 : 0;
+  const shell = molting ? '#7d9478' : CHITIN.shell;
+
+  ellipse(c, b.x + 3, b.y + 6, 52 * scale, 19 * scale, '#0a0e1499');
+  c.save();
+  c.translate(Math.round(b.x), Math.round(b.y));
+  c.scale(scale, GROUND_SCALE * scale);
+  c.rotate(a);
+
+  // Six legs, three a side, stepping in opposition.
+  for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const lift = Math.sin(game.time * 7 + i * 2 + (side > 0 ? Math.PI : 0)) * 5 * (gait ? 1 : 0);
+    const bx = -10 + i * 13, out = side * (30 + i * 4);
+    path(c, [[bx, side * 11], [bx - 6 + lift, side * 28], [bx - 14 + lift, out]], 5, CHITIN.joint);
+    path(c, [[bx, side * 11], [bx - 6 + lift, side * 28], [bx - 13 + lift, out]], 3, shell);
+    path(c, [[bx - 13 + lift, out], [bx - 19 + lift, out + side * 7]], 2, CHITIN.dark);
+  }
+
+  // The carapace: plated, wider at the shoulders, tapering to the tail root.
+  poly(c, [[-36, -28], [24, -32], [46, 0], [24, 32], [-36, 28], [-48, 0]], CHITIN.dark);
+  poly(c, [[-32, -23], [21, -26], [37, 0], [21, 26], [-32, 23], [-41, 0]], shell);
+  for (let i = 0; i < 4; i++) {
+    const px = 20 - i * 15;
+    path(c, [[px, -24 + i * 2], [px, 24 - i * 2]], 2, CHITIN.joint);
+    path(c, [[px + 3, -20 + i * 2], [px + 3, 20 - i * 2]], 1, CHITIN.lit);
+  }
+  // Eyes in a row along the front plate.
+  for (let i = -1; i <= 1; i++) ellipse(c, 32, i * 7, 3, 3, molting ? '#e8f0d8' : '#d8e04a');
+
+  // Claws, held out in front and opening through the windup.
+  for (const side of [-1, 1]) {
+    const yaw = side * (16 + open * 8);
+    c.save();
+    c.translate(38, yaw);
+    c.rotate(side * (.35 - open * .5));
+    path(c, [[0, 0], [22, side * 4]], 7, CHITIN.joint);
+    path(c, [[0, 0], [21, side * 4]], 4, shell);
+    // The pincer itself: a fixed jaw and a moving one.
+    poly(c, [[20, side * 2], [46, side * -8], [56, side * 2], [44, side * 10], [24, side * 10]], CHITIN.dark);
+    poly(c, [[23, side * 3], [43, side * -5], [51, side * 2], [41, side * 8], [26, side * 8]], shell);
+    c.save();
+    c.rotate(side * -open * .6);
+    poly(c, [[36, side * 2], [58, side * -6], [62, side * 1], [44, side * 7]], CHITIN.edge);
+    c.restore();
+    path(c, [[28, side * 5], [46, side * 1]], 1, CHITIN.lit);
+    c.restore();
+  }
+  c.restore();
+
+  // The tail comes up out of the ground plane, so it is drawn in screen space.
+  const rootX = b.x - Math.cos(a) * 38 * scale, rootY = b.y - Math.sin(a) * 38 * scale * GROUND_SCALE;
+  const strike = b.state === 'sting' ? 1 : b.state === 'stingWind'
+    ? -Math.min(1, 1 - Math.max(0, b.timer) / (b.windDuration || 1)) * .6 : 0;
+  const arcX = Math.cos(a) * 26 * scale, lift = (78 - strike * 96) * scale;
+  const seg = (t) => [
+    rootX + arcX * t + Math.cos(a) * 34 * scale * t * t,
+    rootY - lift * Math.sin(t * 2.1) - t * 10 * scale,
+  ];
+  const tail = [0, .2, .4, .6, .8, 1].map(seg);
+  path(c, tail, 13 * scale, CHITIN.joint);
+  path(c, tail, 9 * scale, shell);
+  for (const t of [.2, .4, .6, .8]) {
+    const [sx, sy] = seg(t);
+    ellipse(c, sx, sy, 6 * scale, 5 * scale, CHITIN.dark);
+    ellipse(c, sx, sy - 1, 4 * scale, 3 * scale, CHITIN.lit);
+  }
+  // The sting, and whatever it has been keeping in it.
+  const [tx, ty] = seg(1);
+  poly(c, [[tx - 7 * scale, ty], [tx + 2 * scale, ty - 9 * scale], [tx + 9 * scale, ty + 3 * scale], [tx, ty + 9 * scale]], CHITIN.dark);
+  poly(c, [[tx - 3 * scale, ty], [tx + 2 * scale, ty - 6 * scale], [tx + 6 * scale, ty + 2 * scale]], '#c2d8a8');
+  if (!molting) ellipse(c, tx + 5 * scale, ty + 5 * scale, 3, 3, '#d8e04a');
+
+  // Coming out of the old shell: the new one is still wet and bright.
+  if (pale > 0) {
+    c.globalAlpha = pale * .5;
+    ellipse(c, b.x, b.y, 60 * scale, 34 * scale, '#dff0d8');
+    c.globalAlpha = 1;
+  }
+  if (rider) drawFusion(c, b, a, scale);
+}
+
+/**
+ * What comes up out of the shell after it closes over him. Not a man on a
+ * scorpion: the scorpion is most of it, and he is the part that grew out of
+ * the front — ribs plated over in chitin, the spine running back under the
+ * carapace, one arm ending in the gun the hold was full of.
+ */
+function drawFusion(c, b, a, scale) {
+  // Anchored to the front plate of the carapace, not hovering over the middle.
+  const fx = b.x + Math.cos(a) * 30 * scale;
+  const fy = b.y + Math.sin(a) * 30 * scale * GROUND_SCALE - 30 * scale;
+  const mirror = Math.cos(a) < 0 ? -1 : 1;
+  const wind = b.state?.endsWith('Wind');
+  const raise = wind ? Math.min(1, 1 - Math.max(0, b.timer) / (b.windDuration || 1)) : 0;
+  const heave = Math.sin(game.time * 3.4) * 2;
+  const bone = '#cdd0bb', boneDark = '#8d907e';
+
+  c.save();
+  c.translate(Math.round(fx), Math.round(fy));
+  c.scale(mirror * scale, scale);
+
+  // Chitin creeping up out of the shell and over what is left of his hips.
+  poly(c, [[-24, 10], [-16, -10], [0, -16], [16, -10], [24, 10], [10, 18], [-10, 18]], CHITIN.dark);
+  poly(c, [[-19, 8], [-13, -7], [0, -12], [13, -7], [19, 8], [8, 14], [-8, 14]], CHITIN.shell);
+  for (let i = -2; i <= 2; i++) path(c, [[i * 7, -10], [i * 8, 12]], 1, CHITIN.joint);
+
+  // The ribcage, half of it plated over, the coat rotted onto the bone.
+  const t = -18 + heave * .4;
+  poly(c, [[-15, t + 4], [-12, t - 26], [0, t - 34], [12, t - 26], [15, t + 4], [0, t + 10]], '#171319');
+  poly(c, [[-12, t + 2], [-10, t - 24], [0, t - 30], [10, t - 24], [12, t + 2], [0, t + 7]], bone);
+  for (let i = 0; i < 5; i++) path(c, [[-10 + i * .6, t - 22 + i * 6], [10 - i * .6, t - 22 + i * 6]], 2, boneDark);
+  // Chitin has taken the right half of him; the plates run up into the collar.
+  poly(c, [[1, t - 30], [12, t - 25], [14, t + 2], [1, t + 7]], '#4c6350dd');
+  for (let i = 0; i < 4; i++) path(c, [[2, t - 24 + i * 7], [13, t - 22 + i * 7]], 1, CHITIN.joint);
+  // The rag of the coat, hanging off the join rather than worn.
+  poly(c, [[-16, t - 18], [-26, t + 6], [-20, 16], [-11, 2]], '#332c33');
+  poly(c, [[-16, t - 16], [-23, t + 4], [-18, 12], [-12, 0]], '#453a44');
+
+  // The skull, pushed forward on a neck of shell, jaw gone, both lights lit.
+  path(c, [[0, t - 28], [1, t - 40]], 7, CHITIN.joint);
+  ellipse(c, 1, t - 48, 10, 11, '#171319');
+  ellipse(c, 1, t - 48, 8, 9, bone);
+  rect(c, -3, t - 49, 3, 3, '#6fd6b0');
+  rect(c, 4, t - 49, 3, 3, '#6fd6b0');
+  for (let i = 0; i < 4; i++) rect(c, -4 + i * 3, t - 41, 2, 4, boneDark);
+  // A crest of chitin where the hat was, grown straight through the crown.
+  poly(c, [[-11, t - 54], [-3, t - 68], [3, t - 58], [9, t - 70], [13, t - 52], [1, t - 56]], CHITIN.dark);
+  poly(c, [[-8, t - 55], [-2, t - 64], [2, t - 57], [7, t - 65], [10, t - 53]], CHITIN.lit);
+
+  // The sword arm, still his, still swinging.
+  const hx = 20 + raise * 10, hy = t - 6 - raise * 26;
+  path(c, [[12, t - 20], [18, t - 14 - raise * 8], [hx, hy]], 5, '#171319');
+  path(c, [[12, t - 19], [17, t - 14 - raise * 8], [hx - 1, hy]], 3, bone);
+  c.save();
+  c.translate(hx, hy);
+  c.rotate(-.8 - raise * 1.4);
+  poly(c, [[0, -3], [44, -12], [56, -4], [44, 4], [0, 4]], '#171319');
+  poly(c, [[2, -2], [42, -10], [52, -4], [42, 2], [2, 2]], '#9aa7a0');
+  c.restore();
+
+  // The other arm ends in the gun. It did not pick it up; it came in with him.
+  const gy = t - 8, gx = -20 - raise * 6;
+  path(c, [[-12, t - 20], [-18, t - 12], [gx + 4, gy]], 6, '#171319');
+  path(c, [[-12, t - 19], [-17, t - 12], [gx + 4, gy]], 4, CHITIN.shell);
+  rect(c, gx - 22, gy - 7, 30, 13, '#1d1a20');
+  rect(c, gx - 20, gy - 5, 26, 8, '#3f3a33');
+  rect(c, gx - 26, gy - 9, 9, 17, '#2b3330');
+  rect(c, gx - 25, gy - 7, 6, 13, '#6b5340');
+  for (let i = 0; i < 3; i++) path(c, [[gx - 16 + i * 8, gy - 7], [gx - 16 + i * 8, gy + 6]], 1, CHITIN.joint);
+  // Lit at the mouth while it is about to go off.
+  if (raise > .5 && (b.state === 'cannonWind' || b.state === 'blunderbussWind' || b.state === 'bonesWind'))
+    ellipse(c, gx - 28, gy, 4 + raise * 4, 4 + raise * 3, '#ffcf7a');
+  c.restore();
 }

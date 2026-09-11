@@ -541,6 +541,7 @@ export function buildSunken() {
     veins: [],
     npcs: [
       ...SUNKEN_FIRES.map(f => ({ ...f, type: 'fire' })),
+      { x: SUNKEN.throne.x, y: SUNKEN.throne.y + 40, name: 'The stair under the throne', type: 'throne' },
     ],
     solids: [
       ...SUNKEN_FIRES.map(f => ({ x: f.x, y: f.y + 4, rx: 20, ry: 11, name: f.name })),
