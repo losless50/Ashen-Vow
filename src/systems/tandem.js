@@ -11,7 +11,7 @@
  * Buried kingdoms. Same roots.
  */
 import { game, player, ARENA } from '../core/state.js';
-import { entities } from './entities.js';
+import { entities, ENEMY_KINDS } from './entities.js';
 import { hurt, cancelAttack, venom } from './combat.js';
 import { burst, bleed } from './effects.js';
 import { updateShots } from './enemies.js';
@@ -25,14 +25,14 @@ import { GROUND_SCALE } from './vaelira-patterns.js';
  * 1 was the first pass; this fight is meant to be the wall at the end of the
  * vault, and two bodies attacking at once is most of the reason it is one.
  */
-export const DIFFICULTY = 1.75;
+export const DIFFICULTY = 2.3;
 /**
  * Health is deliberately NOT on that knob. Pressure is what makes a fight hard;
  * health only makes it long, and this one already costs him a whole extra bar
  * every time he swings at the wrong body. Raise DIFFICULTY to make it hurt,
  * raise this only if the fight is ending too early.
  */
-const HP_SCALE = 1.3;
+const HP_SCALE = 1.45;
 
 const dmg = n => Math.round(n * (.8 + DIFFICULTY * .2));
 /** Windups and openings shrink as the difficulty rises, but never to nothing. */
@@ -50,14 +50,14 @@ const MOLT_TIME = 1.9, ABSORB_TIME = 3.4;
  */
 const WIND = {
   slash: pace(.3), cleave: pace(.62), bones: pace(.5), blunderbuss: pace(.58),
-  pincer: pace(.66), sting: pace(.82), spray: pace(.6), burrow: pace(.7), skitter: pace(.3),
-  charge: pace(.76), cannon: pace(.9), sweep: pace(.7),
+  pincer: pace(.6), sting: pace(.74), spray: pace(.54), burrow: pace(.64), skitter: pace(.3),
+  pounce: pace(.56), charge: pace(.76), cannon: pace(.9), sweep: pace(.7), brood: pace(1.5),
 };
 /** Every committed blow still ends with room to close in and punish it. */
 const OPENING = {
   slash: pace(.34), cleave: pace(.95), bones: pace(.62), blunderbuss: pace(.8),
-  pincer: pace(.95), sting: pace(1.05), spray: pace(.8), burrow: pace(1), skitter: pace(.38),
-  charge: pace(1.15), cannon: pace(1.2), sweep: pace(1),
+  pincer: pace(.72), sting: pace(.8), spray: pace(.62), burrow: pace(.78), skitter: pace(.38),
+  pounce: pace(.84), charge: pace(1.15), cannon: pace(1.2), sweep: pace(1), brood: pace(1.6),
 };
 
 /**
@@ -66,9 +66,19 @@ const OPENING = {
  */
 const MOVES = {
   captain: ['slash', 'bones', 'slash', 'cleave', 'slash', 'blunderbuss'],
-  molt: ['sting', 'pincer', 'spray', 'sting', 'burrow', 'pincer'],
-  crowned: ['charge', 'sting', 'cannon', 'slash', 'sweep', 'spray', 'blunderbuss', 'bones', 'sting', 'cannon'],
+  // The beast is the busier of the two: it never stops arriving.
+  molt: ['pounce', 'sting', 'pincer', 'spray', 'pounce', 'sting', 'burrow', 'pincer'],
+  // Everything he had, with what it put in him running through all of it.
+  crowned: ['slash', 'cannon', 'pounce', 'bones', 'charge', 'blunderbuss', 'slash',
+    'sting', 'sweep', 'cannon', 'spray', 'slash', 'pincer', 'bones'],
 };
+
+/**
+ * The thing it does that nothing else does. Held back to fixed marks on the
+ * bar rather than left in the rotation, so it lands as an event.
+ */
+const BROOD_AT = [.72, .46, .2];
+const BROOD_COUNT = 5;
 
 /** How many cuts the fast attack strings together before it lets go. */
 const SLASH_CHAIN = 3;
@@ -177,11 +187,21 @@ const inCone = (b, reach, half) =>
 
 // --- what they do with their hands, claws and what is left of both ----------------
 
+/**
+ * Stage two is his moveset with her in it. Everything the merged thing swings
+ * carries venom; the same move off the captain alone does not.
+ */
+const venomous = b => b.role === 'crowned';
+const withVenom = (b, seconds, damage) => { if (venomous(b)) venom(seconds, dmg(damage)); };
+
 function resolve(b, move) {
   const pair = b.pair;
   const aim = Math.atan2(b.dy, b.dx);
   b.state = move;
   b.hit = false;
+
+  if (move === 'pounce') { b.timer = .36; tone(170, .18, 'sawtooth'); return; }
+  if (move === 'brood') { hatch(b); recover(b, move); return; }
 
   if (move === 'slash') {
     // Lightning: barely a windup, a short cut, and straight into the next one.
@@ -199,12 +219,13 @@ function resolve(b, move) {
   if (move === 'bones') {
     // A fan of what is left of his crew.
     const n = pair.stage === 2 ? 9 : 6;
-    for (let i = 0; i < n; i++) shot(b, aim + (i - (n - 1) / 2) * .19, 360, dmg(19), 'bone');
+    for (let i = 0; i < n; i++)
+      shot(b, aim + (i - (n - 1) / 2) * .19, 360, dmg(19), venomous(b) ? 'foulbone' : 'bone');
     sample('impact', .5, 1.5);
   } else if (move === 'blunderbuss') {
     // Close work: a wide cone of scrap that does not travel far.
-    for (let i = -3; i <= 3; i++) shot(b, aim + i * .13, 470, dmg(16), 'scrap');
-    if (inCone(b, 190, .5)) { hurt(dmg(26), b.x, b.y); }
+    for (let i = -3; i <= 3; i++) shot(b, aim + i * .13, 470, dmg(16), venomous(b) ? 'foulscrap' : 'scrap');
+    if (inCone(b, 190, .5) && player.inv <= 0) { hurt(dmg(26), b.x, b.y); withVenom(b, 3, 12); }
     game.shake = 5;
     tone(90, .24, 'sawtooth');
   } else if (move === 'cannon') {
@@ -212,7 +233,7 @@ function resolve(b, move) {
     entities.shots.push({
       kind: 'shell', x: b.x + Math.cos(aim) * 26, y: b.y - 40 + Math.sin(aim) * 14,
       vx: Math.cos(aim) * 300, vy: Math.sin(aim) * 300 * GROUND_SCALE,
-      angle: aim, life: 2.4, damage: dmg(38), hit: false, burst: dmg(30), pair,
+      angle: aim, life: 2.4, damage: dmg(38), hit: false, burst: dmg(30), pair, foul: venomous(b),
     });
     game.shake = 8;
     tone(58, .4, 'triangle');
@@ -256,7 +277,11 @@ function act(b, dt) {
     b.x += b.dx * 300 * dt;
     b.y += b.dy * 300 * dt * GROUND_SCALE;
     clamp(b);
-    if (!b.hit && inCone(b, 92, 1) && player.inv <= 0) { hurt(dmg(22), b.x, b.y); b.hit = true; }
+    if (!b.hit && inCone(b, 92, 1) && player.inv <= 0) {
+      hurt(dmg(22), b.x, b.y);
+      withVenom(b, 2, 11);
+      b.hit = true;
+    }
     if (b.timer <= 0) {
       if (++b.chain < SLASH_CHAIN) { windup(b, 'slash'); b.timer *= .45; b.windDuration = b.timer; }
       else { b.chain = 0; recover(b, move); }
@@ -270,10 +295,26 @@ function act(b, dt) {
     clamp(b);
     if (!b.hit && rangeTo(b) < (move === 'charge' ? 92 : 70) && player.inv <= 0) {
       hurt(dmg(move === 'charge' ? 44 : 36), b.x, b.y);
+      withVenom(b, 3, 13);
       b.hit = true;
     }
   } else if (move === 'pincer') {
     if (!b.hit && inCone(b, 122, 1.1) && player.inv <= 0) { hurt(dmg(32), b.x, b.y); b.hit = true; }
+  } else if (move === 'pounce') {
+    // Off the ground entirely, and it poisons the floor where it comes down.
+    const t = 1 - Math.max(0, b.timer) / .36;
+    b.x += b.dx * 520 * dt;
+    b.y += b.dy * 520 * dt * GROUND_SCALE;
+    b.hop = Math.sin(t * Math.PI) * 46;
+    clamp(b);
+    if (b.timer <= 0) {
+      b.hop = 0;
+      pool(b.pair, b.x, b.y, 52);
+      burst(b.x, b.y, '#9fd64a', 28);
+      game.shake = 7;
+      if (rangeTo(b) < 78 && player.inv <= 0) { hurt(dmg(34), b.x, b.y); venom(3, dmg(15)); }
+      tone(96, .26, 'triangle');
+    }
   } else if (move === 'sting') {
     // The heavy one. It lands hard and it leaves venom in the wound, but the
     // venom is a few seconds of it, not a slow drain for the rest of the fight.
@@ -290,6 +331,71 @@ function act(b, dt) {
   }
 
   if (b.timer <= 0) recover(b, move);
+}
+
+// --- the brood --------------------------------------------------------------------
+
+/**
+ * It splits its own back open and the inside of it comes out running. They are
+ * small and they die easily, but nothing in the game is faster and nothing else
+ * puts this much venom in him this quickly — the answer is to kill them, now,
+ * and the cost of killing them is every second not spent on the thing that
+ * made them.
+ */
+function hatch(b) {
+  const pair = b.pair;
+  for (let i = 0; i < BROOD_COUNT; i++) {
+    const a = (i / BROOD_COUNT) * Math.PI * 2 + Math.random();
+    entities.enemies.push({
+      id: 'throne-brood', kind: 'spawnling', arena: true, skin: 'brood',
+      x: clampX(b.x + Math.cos(a) * 46), y: clampY(b.y + Math.sin(a) * 46 * GROUND_SCALE),
+      hp: ENEMY_KINDS.spawnling.hp, max: ENEMY_KINDS.spawnling.hp,
+      state: 'chase', timer: 0, cool: .35 + i * .08, hit: false, dx: 0, dy: 1,
+      born: game.time, phase: Math.random() * 6.28,
+    });
+  }
+  pair.broods = (pair.broods || 0) + 1;
+  burst(b.x, b.y - 20, '#9fd64a', 70);
+  game.shake = 11;
+  sample('creatureSnarl', .9, 1.35);
+  notify(pair.broods > 1
+    ? 'Its back opens again. More of them.'
+    : 'Its back splits and the inside of it comes out running. Kill them first — they are quick, and they are full of it.');
+}
+
+const clampX = x => Math.max(ARENA.minX + 16, Math.min(ARENA.maxX - 16, x));
+const clampY = y => Math.max(ARENA.minY + 16, Math.min(ARENA.maxY - 16, y));
+
+/** The brood runs him down and touches him. That is the whole of their plan. */
+function updateBrood(dt) {
+  const k = ENEMY_KINDS.spawnling;
+  for (const e of entities.enemies) {
+    if (!e.arena || e.hp <= 0) continue;
+    e.cool -= dt;
+    const dx = player.x - e.x, dy = (player.y - e.y) / GROUND_SCALE;
+    const d = Math.hypot(dx, dy) || 1;
+    e.dx = dx / d;
+    e.dy = dy / d;
+    // Enough of a weave that they arrive spread out rather than as one point,
+    // but not so much that the fastest thing in the game reads as slow.
+    const weave = Math.sin(game.time * 9 + e.phase) * .2;
+    e.x += (e.dx * Math.cos(weave) - e.dy * Math.sin(weave)) * k.speed * dt;
+    e.y += (e.dx * Math.sin(weave) + e.dy * Math.cos(weave)) * k.speed * dt * GROUND_SCALE;
+    e.x = clampX(e.x);
+    e.y = clampY(e.y);
+    if (d < k.hitRange && e.cool <= 0 && player.inv <= 0) {
+      e.cool = k.cool;
+      hurt(k.damage, e.x, e.y);
+      venom(k.venom.time, k.venom.damage);
+      burst(e.x, e.y - 8, '#9fd64a', 6);
+    }
+  }
+  entities.enemies = entities.enemies.filter(e => !e.arena || e.hp > 0);
+}
+
+/** Nothing the throne made outlives it. */
+function clearBrood() {
+  entities.enemies = entities.enemies.filter(e => !e.arena);
 }
 
 // --- the bodies -------------------------------------------------------------------
@@ -332,8 +438,15 @@ export function updateTandem(dt, b) {
   if (pair.stage === 'absorbing') { absorb(dt, pair); tickFloor(dt, pair); return; }
 
   if (pair.stage === 1) for (const body of [pair.captain, pair.molt]) { if (body.hp > 0) updateBody(dt, body); }
-  else updateBody(dt, b);
+  else {
+    // The ultimate interrupts whatever it was going to do next, at fixed marks.
+    const left = b.hp / b.max;
+    const due = BROOD_AT.filter(m => left <= m).length;
+    if (due > (pair.broods || 0) && b.state !== 'brood' && b.state !== 'broodWind') windup(b, 'brood');
+    updateBody(dt, b);
+  }
 
+  updateBrood(dt);
   tickFloor(dt, pair);
 }
 
@@ -471,9 +584,11 @@ export function tandemHurt(b) {
 export function clearTandem(b) {
   entities.shots = [];
   entities.wave = [];
+  clearBrood();
   if (b?.pair) b.pair.pools = [];
 }
 
 export function tandemDefeated() {
   cancelAttack();
+  clearBrood();
 }

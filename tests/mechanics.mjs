@@ -2405,7 +2405,8 @@ check('the two on the throne: killing the captain merges them into one boss', ()
   // The merged form fights on its own rotation, and this time it can die.
   const states = new Set();
   for (let i = 0; i < 1200; i++) { updateBoss(.035); states.add(entities.boss.state); }
-  for (const move of ['chargeWind', 'stingWind', 'cannonWind', 'sweepWind', 'slashWind', 'bonesWind'])
+  for (const move of ['chargeWind', 'stingWind', 'cannonWind', 'sweepWind', 'slashWind',
+    'bonesWind', 'pounceWind', 'blunderbussWind', 'pincerWind'])
     assert.ok(states.has(move), `the thing they became uses ${move}`);
   entities.boss.hp = 0;
   assert.equal(bossSpec().onLethal(entities.boss), false, 'and nothing catches it the third time');
@@ -2431,8 +2432,11 @@ check('the two on the throne: both of them swing at once, and both use their own
   for (const move of ['slashWind', 'cleaveWind', 'bonesWind', 'blunderbussWind'])
     assert.ok(seen.captain.has(move), `the captain uses ${move}`);
   // Hers: claws, the poisoned tail, venom on the floor, and going under it.
-  for (const move of ['stingWind', 'pincerWind', 'sprayWind', 'burrowWind'])
+  for (const move of ['stingWind', 'pincerWind', 'sprayWind', 'burrowWind', 'pounceWind'])
     assert.ok(seen.molt.has(move), `the beast uses ${move}`);
+  // The beast is meant to be the busier of the two, not the one standing about.
+  const busyFor = t => [...seen[t]].length;
+  assert.ok(busyFor('molt') >= 6, 'and it has a full hand of them');
   // Both stay inside the arena the whole time.
   for (const body of [pair.captain, pair.molt]) {
     assert.ok(body.x >= state.ARENA.minX && body.x <= state.ARENA.maxX, `${body.role} stays in the room`);
@@ -2473,6 +2477,101 @@ check('the two on the throne: the tail poisons hard and briefly, and the floor i
   updateBoss(.035);
   assert.ok(player.poison > 0, 'and standing in it takes hold');
   combat.clearVenom();
+  Object.assign(progress, saved);
+});
+
+check('the throne itself: his hands, with what it put in him running through them', () => {
+  const saved = structuredClone(progress);
+  progress.bosses = {};
+  enterBoss('tandem');
+  const pair = entities.boss.pair;
+  game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+
+  // The captain alone cuts, and that is all he does.
+  player.hp = 1e9; player.inv = 0; combat.clearVenom();
+  const cap = pair.captain;
+  // Standing in front of the swing, not behind it.
+  cap.x = player.x - 40; cap.y = player.y; cap.dx = 1; cap.dy = 0;
+  cap.move = 'slash'; cap.state = 'slash'; cap.timer = .16; cap.hit = false;
+  const before = player.hp;
+  updateBoss(.035);
+  assert.ok(player.hp < before, 'the cut lands');
+  assert.equal(player.poison, 0, 'but his cutlass is only a cutlass while he is his own man');
+
+  // Merged, the same cut carries venom.
+  cap.hp = 0;
+  bossSpec().onLethal(cap);
+  for (let i = 0; i < 300 && pair.stage !== 2; i++) updateBoss(.035);
+  assert.equal(pair.stage, 2);
+  const one = entities.boss;
+  combat.clearVenom();
+  one.x = player.x - 40; one.y = player.y; one.dx = 1; one.dy = 0;
+  one.move = 'slash'; one.state = 'slash'; one.timer = .16; one.hit = false;
+  player.inv = 0;
+  updateBoss(.035);
+  assert.ok(player.poison > 0, 'the same cut off the merged thing does not stay clean');
+  combat.clearVenom();
+  Object.assign(progress, saved);
+});
+
+check('the throne itself: it opens its back three times, and what comes out is the fastest thing alive', () => {
+  const saved = structuredClone(progress);
+  progress.bosses = {};
+  enterBoss('tandem');
+  const pair = entities.boss.pair;
+  game.dead = false; game.scripted = null; game.modal = false; game.paused = false;
+  pair.captain.hp = 0;
+  bossSpec().onLethal(pair.captain);
+  for (let i = 0; i < 300 && pair.stage !== 2; i++) updateBoss(.035);
+  const b = entities.boss;
+  player.x = 750; player.y = 800; player.hp = 1e9; player.inv = 1;
+
+  // Nothing is out while it is healthy.
+  assert.equal(entities.enemies.filter(e => e.arena).length, 0, 'nothing is out at full health');
+
+  // Three marks down the bar, and a brood at each of them.
+  let last = 0;
+  for (const at of [.6, .35, .1]) {
+    b.hp = Math.round(b.max * at);
+    for (let i = 0; i < 700; i++) {
+      updateBoss(.035);
+      if (entities.enemies.filter(e => e.arena).length > last) break;
+    }
+    const out = entities.enemies.filter(e => e.arena).length;
+    assert.ok(out > last, `it opens again at ${Math.round(at * 100)}%`);
+    last = out;
+  }
+  assert.equal(last, 15, 'five at a time, three times over');
+
+  // Low health, low damage, and nothing in the game moves like them.
+  const fastest = Math.max(...Object.entries(ENEMY_KINDS)
+    .filter(([k]) => k !== 'spawnling').map(([, v]) => v.speed));
+  const pup = ENEMY_KINDS.spawnling;
+  assert.ok(pup.speed > fastest * 1.5, 'the fastest thing in the game by a long way');
+  assert.ok(pup.hp <= 90 && pup.damage <= 12, 'and neither tough nor hard-hitting');
+  assert.ok(pup.venom.damage * pup.venom.time >= 50, 'what they do is the venom');
+
+  // They are real targets in the arena, and they chase him down.
+  assert.equal(livingTargets().filter(t => t.kind === 'spawnling').length, 15, 'all of them can be cut');
+  const one = entities.enemies.find(e => e.arena);
+  one.x = 990; one.y = 830;
+  player.x = 540; player.y = 340;
+  const before = Math.hypot(one.x - player.x, one.y - player.y);
+  for (let i = 0; i < 20; i++) updateBoss(.035);
+  assert.ok(Math.hypot(one.x - player.x, one.y - player.y) < before - 90, 'and they close fast');
+
+  // Contact is what hurts: barely a scratch, and a lungful of venom.
+  combat.clearVenom();
+  player.inv = 0; player.hp = 1e9;
+  one.x = player.x; one.y = player.y; one.cool = 0;
+  updateBoss(.035);
+  assert.ok(player.poison > 0, 'touching one poisons him');
+  assert.ok(player.venomDamage >= 12, 'heavily');
+
+  // Nothing it made outlives the fight.
+  combat.clearVenom();
+  leaveBoss();
+  assert.equal(entities.enemies.filter(e => e.arena).length, 0, 'and the room empties behind him');
   Object.assign(progress, saved);
 });
 

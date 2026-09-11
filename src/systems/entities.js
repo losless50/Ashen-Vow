@@ -19,6 +19,9 @@ export const ENEMY_KINDS = {
   rogue:     { hp: 96,  damage: 28, speed: 104, chase: 260, hold: 34, strike: 64, hitRange: 56, windup: .38, cool: .95, embers: 28, scale: .98, radius: 12, lunge: 260 },
   bandit:    { hp: 150, damage: 38, speed: 72,  chase: 250, hold: 44, strike: 62, hitRange: 70, windup: .62, cool: 1.35, embers: 40, scale: 1.1,  radius: 15 },
   corsair:   { hp: 210, damage: 50, speed: 66,  chase: 270, hold: 48, strike: 70, hitRange: 86, windup: .8,  cool: 1.6, embers: 58, scale: 1.24, radius: 17 },
+  // The brood the throne throws out of itself. Nothing else in the game moves
+  // this fast. They barely hit — what they do is get venom into him and die.
+  spawnling: { hp: 70, damage: 9, speed: 214, chase: 900, hold: 20, strike: 26, hitRange: 30, windup: .2, cool: .5, embers: 9, scale: .5, radius: 8, venom: { time: 4, damage: 14 } },
 };
 
 /** The grove's three Fallen: named, big, and each dies once. The cave opens when all are down. */
@@ -178,7 +181,10 @@ export const isBossBody = t => bossBodies().includes(t);
 /** Everything a player swing is allowed to damage in the current scene. */
 export function livingTargets() {
   return game.scene === 'boss'
-    ? bossBodies().filter(t => t.hp > 0 && !t.untargetable)
+    // A boss may put things of its own on the floor. Only those are targets in
+    // here — anything left over from the wilds is flagged off and stays out.
+    ? [...bossBodies().filter(t => t.hp > 0 && !t.untargetable),
+       ...entities.enemies.filter(e => e.arena && e.hp > 0 && !e.hidden)]
     : entities.enemies.filter(e => e.hp > 0 && !e.hidden);
 }
 

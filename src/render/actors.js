@@ -1034,6 +1034,7 @@ function frogBody(c, pal, breath, raise) {
 
 /** Every creature on the ground: wildlings and brutes, wolves, mushroom-folk and frogs. */
 export function drawCreature(c, e) {
+  if (e.kind === 'spawnling') { drawSpawnling(c, e); return; }
   if (e.kind === 'frog') { drawFrog(c, e); return; }
   if (e.kind === 'wolf' || e.kind === 'sporeling') { drawGroveCreature(c, e); return; }
   drawWildling(c, e);
@@ -1479,19 +1480,28 @@ export function drawWarden(c, b) {
 
 /** An arrow in the air, and the thin bright line it leaves behind it. */
 export function drawArrow(c, a) {
-  if (a.kind === 'bone' || a.kind === 'scrap') {
+  if (a.kind === 'bone' || a.kind === 'scrap' || a.kind === 'foulbone' || a.kind === 'foulscrap') {
+    // What the merged thing throws is wet with the same stuff its tail carries.
+    const foul = a.kind.startsWith('foul');
+    if (foul) {
+      for (let i = 1; i < 4; i++) {
+        c.globalAlpha = .26 - i * .06;
+        ellipse(c, a.x - a.vx * i * .013, a.y - a.vy * i * .013, 5 - i, 4 - i, '#9fd64a');
+      }
+      c.globalAlpha = 1;
+    }
     // What is left of his crew, and what is left of his ship, thrown by hand.
-    const spin = game.time * (a.kind === 'bone' ? 15 : 26) + a.x;
+    const spin = game.time * (a.kind.endsWith('bone') ? 15 : 26) + a.x;
     c.save();
     c.translate(Math.round(a.x), Math.round(a.y));
     c.rotate(spin);
-    if (a.kind === 'bone') {
-      rect(c, -8, -1, 16, 3, '#8d907e');
-      rect(c, -8, -1, 16, 1, '#cdd0bb');
-      for (const e of [-9, 6]) { ellipse(c, e + 1, -2, 3, 2, '#cdd0bb'); ellipse(c, e + 1, 2, 3, 2, '#cdd0bb'); }
+    if (a.kind === 'bone' || a.kind === 'foulbone') {
+      rect(c, -8, -1, 16, 3, foul ? '#5d7a3a' : '#8d907e');
+      rect(c, -8, -1, 16, 1, foul ? '#a8d66a' : '#cdd0bb');
+      for (const e of [-9, 6]) { ellipse(c, e + 1, -2, 3, 2, foul ? '#a8d66a' : '#cdd0bb'); ellipse(c, e + 1, 2, 3, 2, foul ? '#a8d66a' : '#cdd0bb'); }
     } else {
       poly(c, [[-5, -3], [4, -4], [5, 3], [-4, 4]], '#2b3330');
-      poly(c, [[-3, -2], [3, -3], [3, 1], [-2, 2]], '#8d9488');
+      poly(c, [[-3, -2], [3, -3], [3, 1], [-2, 2]], foul ? '#9fd64a' : '#8d9488');
     }
     c.restore();
     return;
@@ -2063,6 +2073,42 @@ export function drawDrownedCaptain(c, b, mounted = false) {
   c.restore();
 }
 
+/** One of the brood: the same thing, a hand's width across, and much quicker. */
+export function drawSpawnling(c, e) {
+  const a = Math.atan2(e.dy, e.dx);
+  const scuttle = Math.sin(game.time * 22 + e.phase);
+  const young = Math.max(0, 1 - (game.time - e.born) * 2.5);
+  ellipse(c, e.x + 1, e.y + 3, 13, 5, '#0a0e1499');
+  c.save();
+  c.translate(Math.round(e.x), Math.round(e.y));
+  c.scale(1, GROUND_SCALE);
+  c.rotate(a);
+  for (const side of [-1, 1]) for (let i = 0; i < 3; i++) {
+    const lift = scuttle * (side > 0 ? 1 : -1) * 2;
+    path(c, [[-3 + i * 4, side * 3], [-5 + i * 5 + lift, side * 11]], 2, '#1a241f');
+  }
+  poly(c, [[-10, -7], [7, -8], [13, 0], [7, 8], [-10, 7], [-14, 0]], '#1d2a24');
+  poly(c, [[-8, -5], [6, -6], [10, 0], [6, 6], [-8, 5], [-11, 0]], '#6d9c2a');
+  for (const side of [-1, 1]) {
+    path(c, [[10, side * 4], [18, side * 7]], 2, '#1a241f');
+    poly(c, [[17, side * 5], [25, side * 2], [27, side * 7], [19, side * 10]], '#5c8a24');
+  }
+  ellipse(c, 8, -3, 1.6, 1.6, '#d8e04a');
+  ellipse(c, 8, 3, 1.6, 1.6, '#d8e04a');
+  c.restore();
+  // The tail, small but held high, and lit at the tip.
+  const tx = e.x - Math.cos(a) * 12, ty = e.y - Math.sin(a) * 12 * GROUND_SCALE;
+  path(c, [[tx, ty], [tx + Math.cos(a) * 2, ty - 14], [tx + Math.cos(a) * 10, ty - 18]], 4, '#1a241f');
+  path(c, [[tx, ty], [tx + Math.cos(a) * 2, ty - 14], [tx + Math.cos(a) * 9, ty - 17]], 2, '#6d9c2a');
+  ellipse(c, tx + Math.cos(a) * 11, ty - 18, 2.5, 2.5, '#c2f05a');
+  // Still wet from the inside of the thing that made it.
+  if (young > 0) {
+    c.globalAlpha = young * .55;
+    ellipse(c, e.x, e.y, 20, 12, '#dff0d8');
+    c.globalAlpha = 1;
+  }
+}
+
 /** The husk it left behind: the same shell, empty, split up the back. */
 export function drawHusk(c, h) {
   ellipse(c, h.x, h.y + 4, 42, 15, '#0a0e1466');
@@ -2094,10 +2140,13 @@ export function drawMolt(c, b, rider = false) {
   const molting = b.state === 'molt';
   const pale = molting ? Math.max(0, b.timer) / 2.3 : 0;
   const shell = molting ? '#7d9478' : CHITIN.shell;
+  // Mid-pounce it is off the floor: the body lifts, the shadow stays and shrinks.
+  const hop = b.hop || 0, by = b.y - hop;
+  const air = 1 - Math.min(.45, hop / 110);
 
-  ellipse(c, b.x + 3, b.y + 6, 52 * scale, 19 * scale, '#0a0e1499');
+  ellipse(c, b.x + 3, b.y + 6, 52 * scale * air, 19 * scale * air, '#0a0e1499');
   c.save();
-  c.translate(Math.round(b.x), Math.round(b.y));
+  c.translate(Math.round(b.x), Math.round(by));
   c.scale(scale, GROUND_SCALE * scale);
   c.rotate(a);
 
@@ -2142,7 +2191,7 @@ export function drawMolt(c, b, rider = false) {
   c.restore();
 
   // The tail comes up out of the ground plane, so it is drawn in screen space.
-  const rootX = b.x - Math.cos(a) * 38 * scale, rootY = b.y - Math.sin(a) * 38 * scale * GROUND_SCALE;
+  const rootX = b.x - Math.cos(a) * 38 * scale, rootY = by - Math.sin(a) * 38 * scale * GROUND_SCALE;
   const strike = b.state === 'sting' ? 1 : b.state === 'stingWind'
     ? -Math.min(1, 1 - Math.max(0, b.timer) / (b.windDuration || 1)) * .6 : 0;
   const arcX = Math.cos(a) * 26 * scale, lift = (78 - strike * 96) * scale;
@@ -2167,10 +2216,10 @@ export function drawMolt(c, b, rider = false) {
   // Coming out of the old shell: the new one is still wet and bright.
   if (pale > 0) {
     c.globalAlpha = pale * .5;
-    ellipse(c, b.x, b.y, 60 * scale, 34 * scale, '#dff0d8');
+    ellipse(c, b.x, by, 60 * scale, 34 * scale, '#dff0d8');
     c.globalAlpha = 1;
   }
-  if (rider) drawFusion(c, b, a, scale);
+  if (rider) drawFusion(c, b, a, scale, hop);
 }
 
 /**
@@ -2179,10 +2228,10 @@ export function drawMolt(c, b, rider = false) {
  * the front — ribs plated over in chitin, the spine running back under the
  * carapace, one arm ending in the gun the hold was full of.
  */
-function drawFusion(c, b, a, scale) {
+function drawFusion(c, b, a, scale, hop = 0) {
   // Anchored to the front plate of the carapace, not hovering over the middle.
   const fx = b.x + Math.cos(a) * 30 * scale;
-  const fy = b.y + Math.sin(a) * 30 * scale * GROUND_SCALE - 30 * scale;
+  const fy = b.y - hop + Math.sin(a) * 30 * scale * GROUND_SCALE - 30 * scale;
   const mirror = Math.cos(a) < 0 ? -1 : 1;
   const wind = b.state?.endsWith('Wind');
   const raise = wind ? Math.min(1, 1 - Math.max(0, b.timer) / (b.windDuration || 1)) : 0;

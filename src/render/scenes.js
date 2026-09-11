@@ -1335,6 +1335,8 @@ export function drawBoss(c) {
   drawArenaActors(c);
 }
 
+const rangeToPlayer = b => Math.hypot(player.x - b.x, (player.y - b.y) / GROUND_SCALE);
+
 /** What the tandem pair is about to do, marked on the floor before it happens. */
 function tandemTells(c, b) {
   const wind = b.windDuration || 1, done = Math.min(1, 1 - Math.max(0, b.timer) / wind);
@@ -1352,6 +1354,32 @@ function tandemTells(c, b) {
     c.stroke();
     c.globalAlpha = 1;
     c.restore();
+  } else if (b.state === 'pounceWind') {
+    // The arc it is about to take, and the poisoned ground it will leave.
+    const reach = Math.min(300, rangeToPlayer(b) + 40);
+    const lx = b.x + Math.cos(a) * reach, ly = b.y + Math.sin(a) * reach * GROUND_SCALE;
+    c.globalAlpha = .3 + done * .35;
+    path(c, [[b.x, b.y], [(b.x + lx) / 2, (b.y + ly) / 2 - 44], [lx, ly]], 3, '#9fd64a');
+    c.globalAlpha = 1;
+    ellipse(c, lx, ly, 54, 54 * GROUND_SCALE, '#9fd64a2e');
+    c.strokeStyle = '#9fd64a';
+    c.lineWidth = 2;
+    c.beginPath();
+    c.ellipse(lx, ly, 54 * done, 54 * GROUND_SCALE * done, 0, 0, 7);
+    c.stroke();
+  } else if (b.state === 'broodWind') {
+    // Its whole back, about to open. The warning is the size of the thing.
+    const r = 90 + done * 70;
+    c.globalAlpha = .2 + done * .4;
+    ellipse(c, b.x, b.y, r, r * GROUND_SCALE, '#9fd64a');
+    c.globalAlpha = 1;
+    c.strokeStyle = '#c2f05a';
+    c.lineWidth = 3;
+    for (let i = 0; i < 5; i++) {
+      const ang = i / 5 * Math.PI * 2 + game.time * 2;
+      path(c, [[b.x + Math.cos(ang) * r * .5, b.y + Math.sin(ang) * r * .5 * GROUND_SCALE],
+        [b.x + Math.cos(ang) * r, b.y + Math.sin(ang) * r * GROUND_SCALE]], 3, '#c2f05a');
+    }
   } else if (b.state === 'burrowWind' || b.state === 'cannonWind') {
     // Where it will come up, or where the shell is aimed to land.
     const r = b.state === 'burrowWind' ? 62 : 56;
@@ -1505,12 +1533,14 @@ function drawTandem(c, b) {
   }
   const bodies = [pair.captain, pair.molt]
     .filter(t => t.hp > 0 && t.state !== 'fallen')
-    .sort((p, q) => p.y - q.y);
-  for (const t of bodies) {
-    tandemTells(c, t);
-    if (t.role === 'captain') drawDrownedCaptain(c, t);
-    else drawMolt(c, t, t.role === 'crowned' && pair.stage === 2);
-  }
+    .map(t => ({ y: t.y, draw: () => {
+      tandemTells(c, t);
+      if (t.role === 'captain') drawDrownedCaptain(c, t);
+      else drawMolt(c, t, t.role === 'crowned' && pair.stage === 2);
+    } }))
+    .concat(entities.enemies.filter(e => e.arena && e.hp > 0)
+      .map(e => ({ y: e.y, draw: () => drawCreature(c, e) })));
+  for (const s of bodies.sort((p, q) => p.y - q.y)) s.draw();
 }
 
 /** The Herald, the shots in the air and the expanding rings, for every arena. */
