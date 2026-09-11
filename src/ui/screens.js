@@ -8,7 +8,7 @@ import { emit } from '../core/events.js';
 import { icon, applyIcon } from './icons.js';
 import { $, element } from './dom.js';
 import { canQuit, quit, isApp, enterFullscreen, exitFullscreen, isFullscreen } from '../core/platform.js';
-import { playMusic, playAmbience, worldTrack } from '../systems/audio.js';
+import { playMusic, playAmbience, worldTrack, worldAmbience } from '../systems/audio.js';
 
 /** Where the camera rests while the title screen is up. */
 const TITLE_VIEW = { x: 700, y: 600 };
@@ -25,7 +25,7 @@ function paint(name) {
   game.paused = name !== 'play';
   // Iron and Ash carries the title and the banishment; Stone and Silence takes over in the wilds.
   playMusic(name === 'play' ? worldTrack(game.region) : 'intro', name === 'play' ? 4 : 2.5);
-  playAmbience(name === 'play' && game.scene === 'wild' ? 'forest' : null, 3);
+  playAmbience(name === 'play' && game.scene === 'wild' ? worldAmbience(game.region) : null, 3);
   if (name === 'play') $('game').focus();
 }
 

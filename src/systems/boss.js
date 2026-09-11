@@ -7,7 +7,7 @@ import { makeVaelira, updateVaelira, tickVaelira, nextStage, vaeliraHurt, clearV
 import { makeTandem, updateTandem, tandemLethal, tandemHurt, clearTandem, tandemDefeated, tandemName } from './tandem.js';
 import { notify } from '../ui/hud.js';
 import { emit } from '../core/events.js';
-import { tone, playMusic, playAmbience, sample, worldTrack, bossTrack } from './audio.js';
+import { tone, playMusic, playAmbience, sample, worldTrack, bossTrack, worldAmbience } from './audio.js';
 
 /** The southern arch back to the wilds, drawn in render/scenes.js at the same spot. */
 export const BOSS_EXIT = { x: 750, y: 840, type: 'exit', name: 'Return to the wilds' };
@@ -148,7 +148,7 @@ export function leaveBoss() {
   cancelAttack();
   dismissHerald();
   playMusic(worldTrack(spec.region), 3);
-  playAmbience('forest', 3);
+  playAmbience(worldAmbience(spec.region), 3);
   game.scene = 'wild';
   player.x = spec.exit.x;
   player.y = spec.exit.y;

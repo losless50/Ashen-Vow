@@ -8,7 +8,7 @@ import { slide, restoreHarvestables, groundAt, exitAt, enterRegion } from '../wo
 import * as world from '../world/world.js';
 import { emit } from '../core/events.js';
 import { notify } from '../ui/hud.js';
-import { tone, playMusic, playAmbience, sample, worldTrack } from './audio.js';
+import { tone, playMusic, playAmbience, sample, worldTrack, worldAmbience } from './audio.js';
 
 /** A cutscene's input: frozen, or a steady walk toward its target. */
 function scriptedInput(script) {
@@ -109,7 +109,7 @@ export function crossTo(key, at) {
   spawnEnemies(key);
   // Each region has its own song; crossing over changes it.
   playMusic(worldTrack(key), 3);
-  playAmbience('forest', 3);
+  playAmbience(worldAmbience(key), 3);
   emit('regionChanged', key);
   notify({
     echo: 'Echo Grove · the light goes out under the trees.',
@@ -202,7 +202,7 @@ export function respawn({ silent = false } = {}) {
   entities.herald = null;
   if (!silent) {
     playMusic(worldTrack(game.region), 3);
-    playAmbience('forest', 3);
+    playAmbience(worldAmbience(game.region), 3);
   }
   spawnEnemies(game.region);
   restoreHarvestables();

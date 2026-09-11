@@ -6,7 +6,7 @@ import { entities, ENEMY_KINDS } from './entities.js';
 import { cancelAttack } from './combat.js';
 import { clearAllEffects } from './effects.js';
 import { spawnEnemies } from './entities.js';
-import { playMusic, playAmbience, tone, worldTrack, bossTrack } from './audio.js';
+import { playMusic, playAmbience, tone, worldTrack, bossTrack, worldAmbience } from './audio.js';
 import { notify } from '../ui/hud.js';
 
 /** The way back out, drawn by render/rooms.js at the same spot. */
@@ -64,5 +64,5 @@ export function leaveRoom() {
   entities.hazards = [];
   spawnEnemies(game.region);
   playMusic(worldTrack(room.region), 3);
-  playAmbience('forest', 3);
+  playAmbience(worldAmbience(room.region), 3);
 }

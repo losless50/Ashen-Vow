@@ -7,6 +7,7 @@ const state = await import('../src/core/state.js');
 const { game, player, progress, keys, camera } = state;
 const { update } = await import('../src/core/loop.js');
 const combat = await import('../src/systems/combat.js');
+const audio = await import('../src/systems/audio.js');
 const { attack, updateAttack, cancelAttack, roll, hurt, attackPose, upgradeToHeavy } = combat;
 const { heal, rest, respawn, updatePlayer, footsteps, crossTo } = await import('../src/systems/player.js');
 const { entities, spawnEnemies, ENEMY_KINDS, SKIN_KEYS, emberReward, livingTargets, isBossBody } = await import('../src/systems/entities.js');
@@ -2573,6 +2574,19 @@ check('the throne itself: it opens its back three times, and what comes out is t
   leaveBoss();
   assert.equal(entities.enemies.filter(e => e.arena).length, 0, 'and the room empties behind him');
   Object.assign(progress, saved);
+});
+
+check('the vault has its own sound: its own track, and no forest under it', () => {
+  assert.equal(audio.worldTrack('sunken'), 'dunes', 'the vault plays its own track, not Hearthwood\u2019s');
+  assert.equal(audio.worldAmbience('sunken'), null, 'and there is no wind in trees on a drowned coast');
+  // The regions that do want a bed still get one, and an unknown region falls back.
+  assert.equal(audio.worldAmbience('echo'), 'forest');
+  assert.equal(audio.worldAmbience('hearthwood'), 'forest');
+  assert.equal(audio.worldAmbience('frostveil'), 'forest', 'a region with no entry still gets the default');
+  // Every track a region can ask for has to actually be registered.
+  for (const region of ['hearthwood', 'echo', 'sunken'])
+    for (const name of [audio.worldTrack(region), audio.bossTrack(region)])
+      assert.ok(audio.trackFile(name), `${region} asks for "${name}" and it exists`);
 });
 
 check('the stair under the Drowned Throne is stood on ground he can reach', () => {

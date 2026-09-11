@@ -187,16 +187,32 @@ const TRACKS = {
   boss: 'the-final-chant.mp3',
   grove: 'mire-of-forgotten-things.mp3',
   groveBoss: 'slimey-spore-swarm.mp3',
+  dunes: 'silent-dunes.mp3',
 };
 
 /** What each region plays in the open, and what its bosses play. */
-const REGION_TRACKS = { hearthwood: ['wilds', 'boss'], echo: ['grove', 'groveBoss'] };
+const REGION_TRACKS = {
+  hearthwood: ['wilds', 'boss'],
+  echo: ['grove', 'groveBoss'],
+  sunken: ['dunes', 'boss'],
+};
+/** The file a registered track name points at, so a typo cannot ship silently. */
+export const trackFile = name => TRACKS[name] || AMBIENCE[name] || null;
 export const worldTrack = region => (REGION_TRACKS[region] || REGION_TRACKS.hearthwood)[0];
 export const bossTrack = region => (REGION_TRACKS[region] || REGION_TRACKS.hearthwood)[1];
 /** Looping beds that sit under the music: the wind in the trees around Hearthwood. */
 const AMBIENCE = {
   forest: 'forest-wind.mp3',
 };
+/**
+ * The bed each region wants under its music. The vault takes none: there are no
+ * trees on a drowned coast, and its own track is the sound of the place.
+ */
+const REGION_AMBIENCE = { hearthwood: 'forest', echo: 'forest', sunken: null };
+// `in`, not `??`: a region listed as null wants no bed at all, which is not the
+// same as a region that has not been given one yet.
+export const worldAmbience = region =>
+  region in REGION_AMBIENCE ? REGION_AMBIENCE[region] : 'forest';
 
 let unlocked = false;
 const playingMusic = [];   // every looping element in flight: [{ channel, name, el, vol, target, rate }]
